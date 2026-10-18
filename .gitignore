@@ -7,3 +7,8 @@ __pycache__/
 .venv/
 venv/
 .env
+
+
+# Data
+DS500_Data_Science_Project_Winter_Term_2026_2027.pdf
+raw_data/
