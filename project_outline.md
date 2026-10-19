@@ -57,3 +57,17 @@ For assessment, students will produce the following components:
 Evaluation is done at the individual level, not at the group level. Thus, the group members’ contributions to the project and presentations will be considered in the evaluation.
 
 All components except for the presentation slides must be submitted one week prior to the final presentation (see schedule below).
+
+
+## OUR TOPIC
+# TOPIC 12:
+# Optimizing the Placement of Electric Vehicle Charging Stations  
+
+Determine where new electric vehicle charging stations should be installed to maximize 
+accessibility, utilization, and geographical coverage. 
+Analyze existing charging infrastructure, population distribution, road networks, points of 
+interest, and potential demand for electric vehicles. Recommend optimal charging station 
+locations under budget and infrastructure constraints, and evaluate different deployment 
+strategies. 
+
+ 
