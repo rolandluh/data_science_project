@@ -1,0 +1,26 @@
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  padding: 0.5rem 1rem;
+  background: #1f2937;
+  color: #ffffff;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+#map {
+  flex: 1;
+  width: 100%;
+}
