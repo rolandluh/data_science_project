@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>EV Charging Station Placement</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,7 +14,48 @@
     <h1>EV Charging Station Placement</h1>
   </header>
   <div id="map"></div>
+  <div id="dock">
+    <label>
+      Population heatmap
+      <input id="population" type="checkbox">
+    </label>
+    <label>
+      EV cars by municipality
+      <input id="ev" type="checkbox">
+    </label>
+    <label>
+      Parking spots
+      <input id="parking" type="checkbox" checked>
+    </label>
+    <label>
+      Study area
+      <select id="region">
+        <option value="circle">Circle on map</option>
+      </select>
+    </label>
+    <label title="Click the map to set the study area center">
+      Study area radius (km)
+      <input id="radius" type="number" min="1" max="50" value="10">
+    </label>
+    <label>
+      Charging technology
+      <select id="technology">
+        <option value="both">AC + DC</option>
+        <option value="ac">AC</option>
+        <option value="dc">DC</option>
+      </select>
+    </label>
+    <label title="Straight-line distance residents should travel to a public charger">
+      Max access distance (km)
+      <input id="access" type="number" min="1" max="20" value="10">
+    </label>
+  </div>
+  <div id="zoom-slider">
+    <input id="zoom" type="range" min="6" max="19" step="1">
+  </div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
