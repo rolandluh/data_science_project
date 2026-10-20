@@ -1,5 +1,6 @@
 """Data acquisition: download BKG district boundaries and Bundesnetzagentur charging stations, save Baden-Württemberg subsets."""
 from pathlib import Path
+import gzip
 import json
 import urllib.error
 import urllib.request
@@ -7,8 +8,11 @@ import zipfile
 
 import geopandas as gpd
 import pandas as pd
+import pyarrow as pa
+import pyarrow.csv as pc
+import pyarrow.parquet as pq
 
-URL = "https://daten.gdz.bkg.bund.de/produkte/vg/vg250_ebenen_0101/2020/vg250_01-01.geo84.shape.ebenen.zip"
+URL ="https://daten.gdz.bkg.bund.de/produkte/vg/vg250_ebenen_0101/2020/vg250_01-01.geo84.shape.ebenen.zip"
 ZIP_PATH = Path("data/raw/vg250.zip")
 LAYER = "vg250_01-01.geo84.shape.ebenen/vg250_ebenen_0101/VG250_KRS.shp"
 OUT_PATH = Path("data/processed/kreise_bw.geojson")
@@ -38,6 +42,7 @@ PARK_OUT = Path("data/processed/parkplaetze_bw.geojson")
 HIST_DIR = Path("data/raw/historie")
 HIST_CSV = HIST_DIR / "20261018_ladesaeulen.csv.gz"
 HIST_OUT = Path("data/processed/historie_bw.geojson")
+HIST_PARQUET_DIR = Path("data/processed/historie_parquet")
 HIST_COLUMNS = [
     "id", "name", "operator_name", "address", "postal_code", "city", "source", "max_electric_power",
     "chargepoint_available_count", "chargepoint_charging_count", "chargepoint_reserved_count",
@@ -212,6 +217,32 @@ def download_historic_weeks(start="2026-02-01", end="2026-10-18"):
             print(f"week {name} downloaded")
         except urllib.error.HTTPError as error:
             print(f"week {name} skipped: {error}")
+
+
+def convert_historic_weeks():
+    # Weekly CSV to parquet in chunks, the files are too large to load at once; converted weeks are skipped
+    HIST_PARQUET_DIR.mkdir(parents=True, exist_ok=True)
+    for csv_path in sorted(HIST_DIR.glob("*_ladesaeulen_woche.csv.gz")):
+        name = csv_path.name[:6]
+        out_path = HIST_PARQUET_DIR / f"{name}.parquet"
+        if out_path.exists():
+            continue
+        with gzip.open(csv_path, "rt", encoding="utf-8", errors="replace") as file:
+            header = file.readline().strip().split(",")
+        read_options = pc.ReadOptions(column_names=header, skip_rows=1, block_size=64 << 20)
+        convert_options = pc.ConvertOptions(
+            column_types={column: pa.string() for column in header},
+            strings_can_be_null=True,
+        )
+        rows = 0
+        with pa.input_stream(csv_path, compression="gzip") as file:
+            with pc.open_csv(file, read_options=read_options, convert_options=convert_options) as reader:
+                with pq.ParquetWriter(out_path.with_suffix(".part"), reader.schema) as writer:
+                    for batch in reader:
+                        writer.write_table(pa.Table.from_batches([batch]))
+                        rows += batch.num_rows
+        out_path.with_suffix(".part").rename(out_path)
+        print(f"week {name} converted: {rows} rows saved to {out_path}")
 
 
 def main():
