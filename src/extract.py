@@ -53,6 +53,9 @@ PARK_COLUMNS = [
 
 
 def save_districts():
+    if OUT_PATH.exists():
+        print(f"{OUT_PATH} already exists, skipping")
+        return
     if not ZIP_PATH.exists():
         urllib.request.urlretrieve(URL, ZIP_PATH)
 
@@ -66,6 +69,9 @@ def save_districts():
 
 
 def save_states():
+    if STATES_OUT.exists():
+        print(f"{STATES_OUT} already exists, skipping")
+        return
     if not ZIP_PATH.exists():
         urllib.request.urlretrieve(URL, ZIP_PATH)
 
@@ -77,6 +83,9 @@ def save_states():
 
 
 def save_chargers():
+    if CHARGERS_OUT.exists():
+        print(f"{CHARGERS_OUT} already exists, skipping")
+        return
     if not CHARGERS_PATH.exists():
         urllib.request.urlretrieve(CHARGERS_URL, CHARGERS_PATH)
 
@@ -96,6 +105,9 @@ def save_chargers():
 
 
 def save_population():
+    if POP_OUT.exists():
+        print(f"{POP_OUT} already exists, skipping")
+        return
     if not POP_ZIP_PATH.exists():
         urllib.request.urlretrieve(POP_URL, POP_ZIP_PATH)
 
@@ -143,6 +155,9 @@ def read_municipality_keys():
 
 
 def save_ev_municipalities():
+    if GEMEINDEN_OUT.exists():
+        print(f"{GEMEINDEN_OUT} already exists, skipping")
+        return
     for url, path in [(FZ3_URL, FZ3_PATH), (FZ27_URL, FZ27_PATH), (URL, ZIP_PATH)]:
         if not path.exists():
             urllib.request.urlretrieve(url, path)
@@ -180,6 +195,9 @@ def _load_parking_csv(path, columns):
 
 
 def save_parking():
+    if PARK_OUT.exists():
+        print(f"{PARK_OUT} already exists, skipping")
+        return
     if not PARK_CSV_PATH.exists():
         urllib.request.urlretrieve(PARK_URL, PARK_CSV_PATH)
 
@@ -208,6 +226,9 @@ def save_parking():
 
 
 def save_historic_stations():
+    if HIST_OUT.exists():
+        print(f"{HIST_OUT} already exists, skipping")
+        return
     # One day of the MobiData BW history (18 Oct 2026); keep the latest snapshot per station
     history = pd.read_csv(HIST_CSV, compression="gzip", low_memory=False)
     history = history.sort_values("datastore_updated_at").drop_duplicates("id", keep="last")
