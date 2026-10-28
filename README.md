@@ -46,6 +46,12 @@ The history download is separate and large (about 20 GB for all weeks in 2026). 
 
 ## Known limits
 
+Optional electricity infrastructure: run `python src/extract_grid.py --district 08221`
+for a Heidelberg pilot, or omit `--district` for Baden-Württemberg, then enable
+the new map toggle. See [power-grid feature documentation](docs/power_grid_feature.md)
+for setup, changes, distance methods, and data limitations. These distances
+describe mapped proximity only; available capacity and connection cost are unknown.
+
 - The map is checked for syntax and served correctly; layout and speed have not been verified in every browser.
 - The Overpass API (OpenStreetMap queries) was unavailable during development, so OSM data is not used yet.
 - Usage is a snapshot, not a session record: utilisation is estimated from charge-point status.

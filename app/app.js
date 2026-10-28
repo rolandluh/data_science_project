@@ -309,7 +309,7 @@ const parkingLayer = L.geoJSON(null, {
       weight: 1,
       bubblingMouseEvents: false,
     }),
-  onEachFeature: (feature, layer) => layer.bindPopup(() => popupHtml(feature.properties)),
+  onEachFeature: (feature, layer) => layer.bindPopup(() => popupHtml(feature.properties) + gridParkingPopup(feature)),
 }).addTo(map);
 
 fetch("../data/processed/parkplaetze_bw.geojson")
@@ -351,3 +351,75 @@ fetch("../data/processed/laender.geojson")
     }).addTo(map);
   })
   .catch((error) => console.error("Could not load state borders", error));
+
+// Optional, precomputed grid snapshot: no Overpass requests from the browser.
+let gridProximity = null;
+const gridInput = document.getElementById("grid");
+const gridStatus = document.getElementById("grid-status");
+const gridColors = { distribution: "#0f766e", other_station: "#64748b", line: "#b45309" };
+const gridLayer = L.geoJSON(null, {
+  style: (feature) => ({
+    color: gridColors[feature.properties.category], weight: 2, fillOpacity: 0.18,
+  }),
+  pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
+    radius: 5, color: gridColors[feature.properties.category], fillOpacity: 0.85,
+  }),
+  onEachFeature: (feature, layer) => {
+    const p = feature.properties;
+    layer.bindPopup(() => "<strong>Mapped electricity infrastructure</strong>" + popupHtml({
+      Name: p.name || "Unknown",
+      Type: p.power,
+      Classification: p.category,
+      "Substation type": p.substation || "Unknown",
+      "Recorded voltage (V)": p.voltage || "Unknown",
+      Operator: p.operator || "Unknown",
+      "OSM reference": p.osm_ref,
+      "Available capacity": "Unknown",
+    }) + "<p>Proximity does not confirm connection feasibility or cost.</p>");
+  },
+});
+let gridData = null;
+
+function gridParkingPopup(feature) {
+  if (!gridProximity) return "<p>Grid proximity data is unavailable or still loading.</p>";
+  const [lon, lat] = feature.geometry.coordinates;
+  const match = gridProximity[`${lon.toFixed(6)},${lat.toFixed(6)}`];
+  if (!match) return "<p>Outside the processed grid study area. Grid proximity is unknown.</p>";
+  const format = (record) => record
+    ? `${Math.round(record.distance_m)} m (${record.osm_ref}; voltage: ${record.voltage || "unknown"})`
+    : "No matching mapped asset found in the search area";
+  return "<strong>Grid proximity</strong>" + popupHtml({
+    "Mapped distribution infrastructure": format(match.distribution),
+    "Mapped line / cable (any voltage)": format(match.line),
+    "Available capacity": "Unknown — operator assessment required",
+  }) + "<p>Straight-line distance to mapped geometry; not a cable route or cost estimate.</p>";
+}
+
+gridInput.addEventListener("change", () => {
+  if (gridInput.checked) {
+    if (gridData && gridLayer.getLayers().length === 0) gridLayer.addData(gridData);
+    gridLayer.addTo(map);
+  }
+  else map.removeLayer(gridLayer);
+});
+fetch("../data/processed/stromnetz_bw.geojson")
+  .then((response) => {
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  })
+  .then((data) => {
+    if (!data.metadata || !Array.isArray(data.features) || !data.parking_proximity) {
+      throw new Error("Invalid grid dataset");
+    }
+    gridData = data;
+    gridProximity = data.parking_proximity;
+    gridInput.disabled = false;
+    const m = data.metadata;
+    gridStatus.textContent = `Grid coverage: ${m.scope}. ${m.asset_count} mapped assets. ` +
+      `Downloaded: ${(m.retrieved_at || "unknown").slice(0, 10)}. ` +
+      "Teal: distribution; grey: other stations; brown: lines/cables. Capacity and connection feasibility unknown.";
+    map.attributionControl.addAttribution('Grid data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>');
+  })
+  .catch(() => {
+    gridStatus.textContent = "Electricity infrastructure unavailable. Other map layers remain usable.";
+  });
