@@ -243,6 +243,49 @@ def save_historic_stations():
     print(f"{len(points)} historic stations in Baden-Württemberg saved to {HIST_OUT}")
 
 
+OSM_PARK_OUT = Path("data/processed/parkplaetze_osm_bw.geojson")
+OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+OVERPASS_QUERY = """
+[out:json][timeout:300];
+area["name"="Baden-Württemberg"]["admin_level"="4"]->.bw;
+(node["amenity"="parking"](area.bw);way["amenity"="parking"](area.bw););
+out center;
+"""
+
+
+def save_osm_parking():
+    if OSM_PARK_OUT.exists():
+        print(f"{OSM_PARK_OUT} already exists, skipping")
+        return
+    import requests
+    resp = requests.post(OVERPASS_URL, data={"data": OVERPASS_QUERY}, timeout=300)
+    resp.raise_for_status()
+    elements = resp.json().get("elements", [])
+    features = []
+    for el in elements:
+        if el["type"] == "node":
+            lat, lon = el["lat"], el["lon"]
+        elif "center" in el:
+            lat, lon = el["center"]["lat"], el["center"]["lon"]
+        else:
+            continue
+        tags = el.get("tags", {})
+        features.append({
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [lon, lat]},
+            "properties": {
+                "osm_id": el["id"], "osm_type": el["type"],
+                "name": tags.get("name"), "parking": tags.get("parking"),
+                "access": tags.get("access"), "capacity": tags.get("capacity"),
+                "fee": tags.get("fee"), "surface": tags.get("surface"),
+                "operator": tags.get("operator"),
+            },
+        })
+    with open(OSM_PARK_OUT, "w", encoding="utf-8") as f:
+        json.dump({"type": "FeatureCollection", "features": features}, f, ensure_ascii=False)
+    print(f"{len(features)} OSM parking features saved to {OSM_PARK_OUT}")
+
+
 HIST_WEEK_URL = "https://mobidata-bw.de/daten/historisierung/woche/{year}/{week}_89fb3a0b-cc42-48a6-b17a-8f1b46abccf1.csv.gz"
 
 
@@ -271,6 +314,7 @@ def main():
     save_ev_municipalities()
     save_parking()
     save_historic_stations()
+    save_osm_parking()
 
 
 if __name__ == "__main__":

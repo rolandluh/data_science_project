@@ -153,7 +153,7 @@ function updateStyles() {
       studyArea !== null &&
       config.region === "circle" &&
       map.distance(studyArea.getLatLng(), station.marker.getLatLng()) <= studyArea.getRadius();
-    const color = station === selectedStation ? "#dc2626" : inside ? "#f59e0b" : "#2563eb";
+    const color = station === selectedStation ? "#16a34a" : inside ? "#f59e0b" : "#2563eb";
     if (color !== station.color) {
       station.color = color;
       station.marker.setStyle({ color, fillColor: color });
@@ -181,7 +181,7 @@ fetch("../data/processed/ladesaeulen.json")
     const records = data.rows.map((row) => Object.fromEntries(data.columns.map((column, i) => [column, row[i]])));
     records.forEach((record) => {
       const marker = L.circleMarker([record["Breitengrad"], record["Längengrad"]], {
-        radius: 4,
+        radius: 3,
         weight: 1,
         fillOpacity: 0.8,
         bubblingMouseEvents: false, // a marker click must not move the study area
@@ -275,9 +275,10 @@ legend.onAdd = () => {
   const symbols = [
     ["dot", "#2563eb", "Charging station (register)"],
     ["dot", "#f59e0b", "Station in study area"],
-    ["dot", "#dc2626", "Selected station"],
-    ["dot", "#7c3aed", "Charging station (historic, 18 Oct 2026)"],
-    ["dot", "#89cff0", "Parking spot"],
+    ["dot", "#16a34a", "Selected station"],
+    ["dot", "#e11d48", "Charging station (historic, 18 Oct 2026)"],
+    ["dot", "#89cff0", "Parking spot (MobiData)"],
+    ["dot", "#22c55e", "Parking spot (OSM)"],
     ["box", "#000000", "State border"],
     ["box", "#2563eb", "Study area / district"],
     ["gradient", "linear-gradient(to right, rgba(37,99,235,0.6), rgba(245,158,11,0.6), rgba(220,38,38,0.8))", "Population heatmap (zoom 9+)"],
@@ -322,13 +323,41 @@ parkingInput.addEventListener("change", () => {
   else map.removeLayer(parkingLayer);
 });
 
-// Stations from the historic feed in Baden-Württemberg (18 Oct 2026) as purple dots
+// OSM parking spots in Baden-Württemberg, shown as green dots
+const parkingOsmInput = document.getElementById("parking-osm");
+const parkingOsmLayer = L.geoJSON(null, {
+  pointToLayer: (feature, latlng) =>
+    L.circleMarker(latlng, {
+      radius: 3,
+      color: "#22c55e",
+      fillColor: "#22c55e",
+      fillOpacity: 0.9,
+      weight: 1,
+      bubblingMouseEvents: false,
+    }),
+  onEachFeature: (feature, layer) => layer.bindPopup(() => popupHtml(feature.properties)),
+});
+
+fetch("../data/processed/parkplaetze_osm_bw.geojson")
+  .then((response) => response.json())
+  .then((data) => {
+    parkingOsmLayer.addData(data);
+    console.log(`${data.features.length} OSM parking features loaded`);
+  })
+  .catch((error) => console.warn("OSM parking not loaded (file may not exist yet)", error));
+
+parkingOsmInput.addEventListener("change", () => {
+  if (parkingOsmInput.checked) parkingOsmLayer.addTo(map);
+  else map.removeLayer(parkingOsmLayer);
+});
+
+// Stations from the historic feed in Baden-Württemberg (18 Oct 2026) as rose dots
 const historicLayer = L.geoJSON(null, {
   pointToLayer: (feature, latlng) =>
     L.circleMarker(latlng, {
-      radius: 4,
-      color: "#7c3aed",
-      fillColor: "#7c3aed",
+      radius: 3,
+      color: "#e11d48",
+      fillColor: "#e11d48",
       fillOpacity: 0.9,
       weight: 1,
       bubblingMouseEvents: false,
