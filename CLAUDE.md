@@ -61,5 +61,6 @@ src/              Python pipeline and (empty) placeholder modules
 ## Git
 
 - `data/` is git-ignored; shared separately
-- Branch protections (PR required, signed commits) exist but are currently bypassed for direct pushes
-- Commit messages include co-author attribution for AI-assisted changes
+- Branch protections (PR required, signed commits)
+- Never push to main, always create a branch first, and then commit thourgh it and create a pull request
+- Commit messages don't include claude participation
