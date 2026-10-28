@@ -15,9 +15,11 @@ data/
   processed/          Files the map reads (git-ignored)
 docs/                 Project outline
 src/
-  extract.py          Download and prepare all data
-  run_pipeline.py     Empty placeholder for the full pipeline
-  prepare.py, validate.py, analyze.py, evaluate.py   Empty placeholders
+  extract.py          Download, refresh and archive source data
+  run_pipeline.py     One-command refresh and validation pipeline
+  validate.py         Validate processed map data and publish update status
+  analyze.py          Check whether enough weekly history exists for ML
+  prepare.py, evaluate.py   Reserved for feature engineering and model evaluation
 requirements.txt      Python packages
 test.py               Scratch file
 ```
@@ -41,6 +43,38 @@ Raw files that are not yet used by the map: the KBA 5 km grid with the EV share 
 2. Create the processed data: `python src/extract.py` (downloads the raw files if missing; the first run takes a while)
 3. Start the map from the project root: `python -m http.server 8000`
 4. Open http://localhost:8000/app/
+
+## Refresh and automation
+
+Validate the currently generated files and write the map's update-status label:
+
+```powershell
+python -m src.run_pipeline
+```
+
+Refresh the configured changing public sources (charger register and parking feed),
+then validate the result:
+
+```powershell
+python -m src.run_pipeline --refresh
+```
+
+The refresh discovers the newest public charger-register CSV from the official
+Bundesnetzagentur download page; it does not need an API key. Set
+`CHARGERS_URL` only when you deliberately want to pin a particular official
+release.
+
+To also fetch and archive a single current historic-status week for future ML
+training, run:
+
+```powershell
+python -m src.run_pipeline --refresh --history
+```
+
+The historic source is Europe-wide, so the pipeline archives only the
+Baden-Württemberg subset in `data/processed/history/` for the ML dataset.
+Run the last command weekly through a server scheduler, not when a visitor
+opens the website. See [automation and team handover](docs/automation-and-handover.md).
 
 The history download is separate and large (about 20 GB for all weeks in 2026). Run it only when needed: `download_historic_weeks()` in `src/extract.py`.
 

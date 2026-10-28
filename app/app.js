@@ -7,6 +7,25 @@ const map = L.map("map", { preferCanvas: true });
 map.fitBounds(badenWuerttemberg);
 map.setMinZoom(map.getBoundsZoom(germany));
 
+// Written by src.run_pipeline after validation. The map remains usable if it is absent.
+const dataStatus = document.getElementById("data-status");
+fetch("../data/processed/update_status.json", { cache: "no-store" })
+  .then((response) => {
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  })
+  .then((report) => {
+    const date = report.generated_at ? new Date(report.generated_at).toLocaleString() : "unknown";
+    const successful = report.datasets?.filter((dataset) => dataset.ok).length || 0;
+    const ml = report.ml;
+    dataStatus.textContent = report.ok
+      ? `Data checked: ${date} (${successful} datasets). ML: ${ml?.status || "not configured"}.`
+      : `Data check needs attention: ${date}. The map shows the last generated files.`;
+  })
+  .catch(() => {
+    dataStatus.textContent = "Data status unavailable; this map uses the local generated files.";
+  });
+
 // Current zoom level shown in the bottom-right corner
 const zoomInfo = L.control({ position: "bottomright" });
 zoomInfo.onAdd = function () {

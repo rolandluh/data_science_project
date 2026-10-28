@@ -20,6 +20,12 @@ h1 {
   font-size: 1.25rem;
 }
 
+#data-status {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  color: #d1d5db;
+}
+
 #map {
   flex: 1;
   width: 100%;
