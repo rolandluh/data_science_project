@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Data Sources Overview</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap">
+<script src="chart.min.js"></script>
+<style>
+  :root {
+    --bg: #f8f7f5;
+    --surface: #ffffff;
+    --fg: #1a1a1a;
+    --fg-muted: #6b6560;
+    --accent: #2d5a3d;
+    --accent-light: #e8f0eb;
+    --border: #e2ddd8;
+    --font-body: 'DM Sans', system-ui, sans-serif;
+    --font-mono: 'DM Mono', ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141312;
+      --surface: #1e1d1b;
+      --fg: #e8e4df;
+      --fg-muted: #9a9590;
+      --accent: #6dbf8b;
+      --accent-light: #1e2e24;
+      --border: #2e2c29;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141312;
+    --surface: #1e1d1b;
+    --fg: #e8e4df;
+    --fg-muted: #9a9590;
+    --accent: #6dbf8b;
+    --accent-light: #1e2e24;
+    --border: #2e2c29;
+    color-scheme: dark;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    line-height: 1.6;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    user-select: none;
+  }
+
+  /* Slide container */
+  .deck {
+    width: 100vw;
+    height: 100vh;
+    position: relative;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 4rem;
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+  }
+  .slide.active {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .slide-inner {
+    max-width: 900px;
+    width: 100%;
+    max-height: 100%;
+    overflow-y: auto;
+  }
+
+  /* Title slide */
+  .slide-title { text-align: center; }
+  .slide-title h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.5rem;
+    text-wrap: balance;
+  }
+  .slide-title .subtitle {
+    font-size: 1.2rem;
+    color: var(--fg-muted);
+    margin-bottom: 0.25rem;
+  }
+  .slide-title .meta {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--fg-muted);
+    margin-top: 1rem;
+  }
+  .slide-title .divider {
+    width: 80px;
+    height: 3px;
+    background: var(--accent);
+    margin: 1.5rem auto;
+    border-radius: 2px;
+  }
+
+  /* Section title */
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  /* Slide headings */
+  .slide h2 {
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    font-weight: 700;
+    margin-bottom: 1rem;
+    letter-spacing: -0.02em;
+  }
+
+  /* Badge */
+  .badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 0.15em 0.6em;
+    border-radius: 4px;
+    background: var(--accent-light);
+    color: var(--accent);
+    white-space: nowrap;
+    vertical-align: middle;
+    margin-left: 0.5rem;
+  }
+
+  /* Stats row */
+  .stat-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin: 1.25rem 0;
+  }
+  .stat {
+    flex: 1 1 140px;
+    min-width: 0;
+    background: var(--accent-light);
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+  }
+  .stat .val {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .stat .label {
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* Card on slides */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  /* Description text */
+  .desc {
+    font-size: 1rem;
+    color: var(--fg-muted);
+    margin-bottom: 0.75rem;
+    line-height: 1.7;
+  }
+
+  /* Lists */
+  .slide ul {
+    padding-left: 1.2rem;
+    margin: 0.5rem 0;
+  }
+  .slide li {
+    font-size: 0.9rem;
+    color: var(--fg-muted);
+    margin: 0.3rem 0;
+  }
+  .slide li strong { color: var(--fg); }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin-top: 0.75rem;
+  }
+  th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--fg-muted);
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem 0.6rem;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  td {
+    padding: 0.5rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  /* Note callout */
+  .note {
+    font-size: 0.85rem;
+    color: var(--fg-muted);
+    border-left: 3px solid var(--accent);
+    padding: 0.6rem 0.85rem;
+    margin: 0.75rem 0;
+    background: var(--accent-light);
+    border-radius: 0 6px 6px 0;
+  }
+
+  /* Flow diagram */
+  .flow-diagram {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.9;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--fg-muted);
+  }
+  .flow-diagram strong { color: var(--accent); font-weight: 500; }
+
+  /* Navigation */
+  .nav-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+  }
+  .nav-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    padding: 0.4rem 1rem;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .nav-btn:hover { background: var(--accent-light); border-color: var(--accent); }
+  .nav-btn:disabled { opacity: 0.3; cursor: default; }
+  .nav-btn:disabled:hover { background: none; border-color: var(--border); }
+
+  /* Dots */
+  .dots {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+  }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.3s, transform 0.3s;
+    cursor: pointer;
+  }
+  .dot.active {
+    background: var(--accent);
+    transform: scale(1.3);
+  }
+
+  /* Slide counter */
+  .slide-counter {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+    min-width: 3rem;
+    text-align: center;
+  }
+
+  /* Click zones */
+  .click-zone {
+    position: fixed;
+    top: 0;
+    bottom: 60px;
+    width: 25%;
+    z-index: 50;
+    cursor: pointer;
+  }
+  .click-zone.left { left: 0; }
+  .click-zone.right { right: 0; }
+
+  /* Flag badges */
+  .flag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    padding: 0.15em 0.5em;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .flag.warn { background: #fef3cd; color: #856404; }
+  .flag.error { background: #f8d7da; color: #721c24; }
+  .flag.ok { background: var(--accent-light); color: var(--accent); }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .flag.warn { background: #3d3520; color: #ffc107; }
+    :root:not([data-theme="light"]) .flag.error { background: #3d1c20; color: #f5867a; }
+  }
+  :root[data-theme="dark"] .flag.warn { background: #3d3520; color: #ffc107; }
+  :root[data-theme="dark"] .flag.error { background: #3d1c20; color: #f5867a; }
+
+  /* Two-column layout for stats slides */
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  @media (max-width: 700px) {
+    .two-col { grid-template-columns: 1fr; }
+  }
+
+  .mini-table { font-size: 0.8rem; }
+  .mini-table td, .mini-table th { padding: 0.3rem 0.5rem; }
+
+  /* Chart containers */
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 340px;
+    margin: 0.75rem 0;
+  }
+  .chart-wrap canvas { width: 100% !important; height: 100% !important; }
+  .chart-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    align-items: start;
+  }
+  @media (max-width: 700px) {
+    .chart-row { grid-template-columns: 1fr; }
+    .chart-wrap { max-height: 260px; }
+    .chart-wrap canvas { max-height: 260px; }
+  }
+
+  /* Completeness heatmap */
+  .heatmap-grid {
+    display: grid;
+    gap: 2px;
+    font-size: 0.65rem;
+    font-family: var(--font-mono);
+  }
+  .heatmap-cell {
+    padding: 3px 5px;
+    text-align: center;
+    border-radius: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .heatmap-header {
+    font-weight: 700;
+    font-size: 0.7rem;
+    padding: 4px 5px;
+    text-align: left;
+  }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .slide { padding: 2rem 1.5rem 4rem; }
+    .stat { flex: 1 1 100px; padding: 0.6rem 0.75rem; }
+    .stat .val { font-size: 1.1rem; }
+    .flow-diagram { font-size: 0.65rem; padding: 0.75rem 1rem; }
+    .dots { gap: 0.3rem; }
+    .dot { width: 6px; height: 6px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="deck" id="deck">
+
+  <!-- Slide 1: Title -->
+  <div class="slide active" data-slide="0">
+    <div class="slide-inner slide-title">
+      <h1>EV Charging Station Placement</h1>
+      <p class="subtitle">Data Sources Overview</p>
+      <div class="divider"></div>
+      <p class="subtitle">Baden-Württemberg &middot; DS500 Winter 2026/2027</p>
+      <p class="meta">Arun &middot; Marko &middot; Roland</p>
+    </div>
+  </div>
+
+  <!-- Slide 2: At a Glance -->
+  <div class="slide" data-slide="1">
+    <div class="slide-inner">
+      <div class="section-label">Overview</div>
+      <h2>At a Glance</h2>
+      <div class="stat-row">
+        <div class="stat"><div class="val">6</div><div class="label">Data sources</div></div>
+        <div class="stat"><div class="val">4</div><div class="label">Institutions</div></div>
+        <div class="stat"><div class="val">~33 GB</div><div class="label">Raw data</div></div>
+        <div class="stat"><div class="val">~44 MB</div><div class="label">Processed (map)</div></div>
+      </div>
+      <div class="card" style="margin-top:1.25rem">
+        <table>
+          <tr><th>Source</th><th>Provider</th><th>Purpose</th><th>Download</th></tr>
+          <tr><td>Ladesäulenregister</td><td>Bundesnetzagentur</td><td>Charging stations</td><td><span class="badge">Python</span></td></tr>
+          <tr><td>Historic Charging</td><td>MobiData BW</td><td>Real-time availability</td><td><span class="badge" style="background:var(--border);color:var(--fg-muted)">Manual</span> + <span class="badge">Python</span></td></tr>
+          <tr><td>Parking Data</td><td>MobiData BW</td><td>Parking locations</td><td><span class="badge">Python</span> (off-street) · <span class="badge" style="background:var(--border);color:var(--fg-muted)">Manual</span> (street)</td></tr>
+          <tr><td>Vehicle Statistics</td><td>KBA</td><td>EV demand proxy</td><td><span class="badge">Python</span></td></tr>
+          <tr><td>Population Grid</td><td>Zensus 2022</td><td>Population density</td><td><span class="badge">Python</span></td></tr>
+          <tr><td>Admin Boundaries</td><td>BKG</td><td>Geometry &amp; filtering</td><td><span class="badge">Python</span></td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 3: Bundesnetzagentur -->
+  <div class="slide" data-slide="2">
+    <div class="slide-inner">
+      <div class="section-label">Data Source</div>
+      <h2>Bundesnetzagentur Ladesäulenregister <span class="badge">Charging Stations</span></h2>
+      <p class="desc">Official register of all public EV charging stations in Germany. Provides station locations, operators, power ratings, connector types, and commissioning dates.</p>
+      <div class="stat-row">
+        <div class="stat"><div class="val">116,443</div><div class="label">Stations (DE)</div></div>
+        <div class="stat"><div class="val">18,863</div><div class="label">Stations (BW)</div></div>
+        <div class="stat"><div class="val">47</div><div class="label">Columns</div></div>
+      </div>
+      <ul>
+        <li>Date: 1 September 2026</li>
+        <li>Format: CSV (semicolon-separated, German locale)</li>
+        <li>Output: <code>ladesaeulen.json</code> (10.1 MB)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Slide 4: MobiData BW Historic -->
+  <div class="slide" data-slide="3">
+    <div class="slide-inner">
+      <div class="section-label">Data Source</div>
+      <h2>MobiData BW Historic Charging <span class="badge">Real-time Status</span></h2>
+      <p class="desc">Historized real-time availability snapshots of charging stations across Europe. Covers 10 data providers with availability, charging, and out-of-order counts.</p>
+      <div class="stat-row">
+        <div class="stat"><div class="val">6,031</div><div class="label">Stations (BW snapshot)</div></div>
+        <div class="stat"><div class="val">36</div><div class="label">Weekly files</div></div>
+        <div class="stat"><div class="val">33 GB</div><div class="label">Raw size</div></div>
+      </div>
+      <ul>
+        <li>Coverage: February &ndash; October 2026 (weeks 05&ndash;40)</li>
+        <li>10 providers: ecomovement, opendata_swiss, chargecloud, EnBW, Tesla, and 5 smaller</li>
+        <li>Output: <code>historie_bw.geojson</code> (3.8 MB, single-day snapshot)</li>
+      </ul>
+      <div class="note">
+        <strong>Data quality:</strong> From week 34 (17 Aug 2026) row counts drop ~90% &mdash; platform-side archiving change (switch to change-only deltas), not data loss.
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 5: MobiData BW Parking -->
+  <div class="slide" data-slide="4">
+    <div class="slide-inner">
+      <div class="section-label">Data Source</div>
+      <h2>MobiData BW Parking Data <span class="badge">Parking</span></h2>
+      <p class="desc">Public parking facilities in Baden-Württemberg: off-street (garages, car parks, underground) and on-street spots. Includes capacity, fees, charging spots, and accessibility.</p>
+      <div class="stat-row">
+        <div class="stat"><div class="val">9,189</div><div class="label">Off-street</div></div>
+        <div class="stat"><div class="val">24,455</div><div class="label">Street</div></div>
+        <div class="stat"><div class="val">28,475</div><div class="label">Combined (BW)</div></div>
+      </div>
+      <ul>
+        <li>Date: October 2026</li>
+        <li>Types: OFF_STREET_PARKING_GROUND, CAR_PARK, UNDERGROUND, ON_STREET</li>
+        <li>Output: <code>parkplaetze_bw.geojson</code> (16.1 MB)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Slide 6: KBA -->
+  <div class="slide" data-slide="5">
+    <div class="slide-inner">
+      <div class="section-label">Data Source</div>
+      <h2>KBA Vehicle Registration Statistics <span class="badge">EV Demand</span></h2>
+      <p class="desc">Vehicle counts by municipality and fuel type from the Federal Motor Transport Authority. Key demand indicator for BEV and plug-in hybrid adoption.</p>
+      <div class="stat-row">
+        <div class="stat"><div class="val">~1,100</div><div class="label">Municipalities</div></div>
+        <div class="stat"><div class="val">14,667</div><div class="label">EV grid cells</div></div>
+      </div>
+      <div class="card">
+        <table>
+          <tr><th>File</th><th>Content</th><th>Status</th></tr>
+          <tr><td>FZ 3 (883 KB)</td><td>AGS keys per municipality</td><td>In pipeline</td></tr>
+          <tr><td>FZ 27 (1.4 MB)</td><td>Car counts by fuel type per municipality</td><td>In pipeline</td></tr>
+          <tr><td>FZ 13 (175 KB)</td><td>Vehicle stock by class</td><td>Not yet used</td></tr>
+          <tr><td>EV Grid (915 KB)</td><td>EV share per 5 km cell</td><td>Not yet used</td></tr>
+        </table>
+      </div>
+      <ul>
+        <li>Date: 1 October 2024 (FZ3/FZ27), January 2025 (EV grid)</li>
+        <li>Output: <code>gemeinden_ev.geojson</code> (3.1 MB)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Slide 7: Zensus -->
+  <div class="slide" data-slide="6">
+    <div class="slide-inner">
+      <div class="section-label">Data Source</div>
+      <h2>Zensus 2022 Population Grid <span class="badge">Population</span></h2>
+      <p class="desc">Population counts on a 1 km grid from the 2022 German Census. Demand proxy: more residents = more potential charging need.</p>
+      <div class="stat-row">
+        <div class="stat"><div class="val">210,556</div><div class="label">Grid cells (DE)</div></div>
+        <div class="stat"><div class="val">3&ndash;24,164</div><div class="label">Residents per cell</div></div>
+      </div>
+      <ul>
+        <li>Census date: 15 May 2022</li>
+        <li>CRS: EPSG:3035, converted to WGS84 in pipeline</li>
+        <li>Output: <code>bevoelkerung_1km.json</code> (1.0 MB)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Slide 8: BKG -->
+  <div class="slide" data-slide="7">
+    <div class="slide-inner">
+      <div class="section-label">Data Source</div>
+      <h2>BKG Administrative Boundaries <span class="badge">Geometry</span></h2>
+      <p class="desc">Official German administrative boundary shapes from the Federal Agency for Cartography and Geodesy. Foundation layer for all spatial filtering and map display.</p>
+      <div class="card">
+        <table>
+          <tr><th>Layer</th><th>Content</th><th>Output</th></tr>
+          <tr><td>VG250_LAN</td><td>16 federal states</td><td><code>laender.geojson</code> (4.8 MB)</td></tr>
+          <tr><td>VG250_KRS</td><td>44 BW districts</td><td><code>kreise_bw.geojson</code> (2.4 MB)</td></tr>
+          <tr><td>VG250_GEM</td><td>1,101 BW municipalities</td><td><code>gemeinden_ev.geojson</code> (merged)</td></tr>
+        </table>
+      </div>
+      <ul>
+        <li>Edition: 1 January 2020</li>
+        <li>Used for: spatial filter (BW = AGS "08"), map borders, choropleth base</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Slide 9: Data Flow -->
+  <div class="slide" data-slide="8">
+    <div class="slide-inner">
+      <div class="section-label">Architecture</div>
+      <h2>Data Flow</h2>
+      <div class="flow-diagram"><strong>Bundesnetzagentur</strong> ─── CSV ──────────┐
+<strong>MobiData BW</strong> ──────── CSV/GeoJSON ──┤
+<strong>KBA</strong> ────────────────── Excel ────────┤  extract.py   ┌─── ladesaeulen.json
+<strong>Zensus 2022</strong> ─────── CSV (ZIP) ─────┤ ───────────── ├─── parkplaetze_bw.geojson
+<strong>BKG VG250</strong> ──────── Shapefile (ZIP) ┘  filter to BW  ├─── gemeinden_ev.geojson
+                                     dedup, join   ├─── bevoelkerung_1km.json
+                                     simplify      ├─── kreise_bw.geojson
+                                                   └─── laender.geojson
+                                                          │
+                                                     Leaflet map
+                                                   (app/index.html)</div>
+    </div>
+  </div>
+
+  <!-- Slide 10: Descriptive Statistics – Chargers & Population -->
+  <div class="slide" data-slide="9">
+    <div class="slide-inner">
+      <div class="section-label">Statistics</div>
+      <h2>Descriptive Statistics: Chargers &amp; Population</h2>
+      <div class="two-col">
+        <div class="card">
+          <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Charging Stations</h3>
+          <table class="mini-table">
+            <tr><th>Metric</th><th>Value</th></tr>
+            <tr><td>Total stations (BW)</td><td>18,863</td></tr>
+            <tr><td>Unique operators</td><td>1,861</td></tr>
+            <tr><td>Top 5 operator share</td><td>23.2%</td></tr>
+            <tr><td>Power: median</td><td>30 kW</td></tr>
+            <tr><td>Power: mean</td><td>64 kW</td></tr>
+            <tr><td>Power: max</td><td>1,200 kW</td></tr>
+            <tr><td>Power missing</td><td>129 (0.7%)</td></tr>
+            <tr><td>High-power outliers (IQR)</td><td>3,131 (16.6%)</td></tr>
+            <tr><td>Co-located stations</td><td>9,417 rows at 2,054 spots</td></tr>
+            <tr><td>Commissioning range</td><td>1992 &ndash; Aug 2026</td></tr>
+          </table>
+        </div>
+        <div class="card">
+          <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Population Grid (Zensus 2022)</h3>
+          <table class="mini-table">
+            <tr><th>Metric</th><th>Value</th></tr>
+            <tr><td>Grid cells (BW)</td><td>21,926</td></tr>
+            <tr><td>Total population</td><td>11,085,182</td></tr>
+            <tr><td>Mean per cell</td><td>506</td></tr>
+            <tr><td>Median per cell</td><td>91</td></tr>
+            <tr><td>Max per cell</td><td>17,870</td></tr>
+            <tr><td>Min per cell</td><td>3</td></tr>
+            <tr><td>High-density outliers (IQR)</td><td>2,656 cells</td></tr>
+          </table>
+          <div class="note" style="margin-top:0.75rem;font-size:0.8rem">
+            Distribution is heavily right-skewed &mdash; 75th percentile is 491 but mean is 506. Most cells are rural; a few urban cells drive the average.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 11: Descriptive Statistics – EV & Parking -->
+  <div class="slide" data-slide="10">
+    <div class="slide-inner">
+      <div class="section-label">Statistics</div>
+      <h2>Descriptive Statistics: EV Registrations &amp; Parking</h2>
+      <div class="two-col">
+        <div class="card">
+          <h3 style="font-size:0.95rem;margin-bottom:0.5rem">EV by Municipality</h3>
+          <table class="mini-table">
+            <tr><th>Metric</th><th>Value</th></tr>
+            <tr><td>Municipalities</td><td>1,106 (2 missing data)</td></tr>
+            <tr><td>Mean cars/municipality</td><td>6,351</td></tr>
+            <tr><td>Mean BEV/municipality</td><td>235</td></tr>
+            <tr><td>Mean PHEV/municipality</td><td>146</td></tr>
+            <tr><td>BEV share: mean</td><td>3.3%</td></tr>
+            <tr><td>BEV share: max</td><td>18.6% (Walldorf)</td></tr>
+            <tr><td>Municipalities with 0 BEV</td><td>7</td></tr>
+            <tr><td>Municipalities with 0 PHEV</td><td>39</td></tr>
+          </table>
+          <div class="note" style="margin-top:0.75rem;font-size:0.8rem">
+            Walldorf (18.6%) and Weissach (12.4%) are extreme outliers &mdash; likely driven by Porsche/SAP corporate fleets.
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Parking</h3>
+          <table class="mini-table">
+            <tr><th>Metric</th><th>Value</th></tr>
+            <tr><td>Total sites</td><td>28,475</td></tr>
+            <tr><td>ON_STREET</td><td>22,648 (79.5%)</td></tr>
+            <tr><td>OFF_STREET</td><td>3,840 (13.5%)</td></tr>
+            <tr><td>CAR_PARK + UNDERGROUND</td><td>615 (2.2%)</td></tr>
+            <tr><td>Capacity: median</td><td>2</td></tr>
+            <tr><td>Capacity: max</td><td>6,000 (Messe P20)</td></tr>
+            <tr><td>Sites with charging data</td><td>438 (1.5%)</td></tr>
+            <tr><td>Total charging spots</td><td>1,100</td></tr>
+            <tr><td>Missing type</td><td>1,370 (4.8%)</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 12: Data Quality Flags -->
+  <div class="slide" data-slide="11">
+    <div class="slide-inner">
+      <div class="section-label">Quality</div>
+      <h2>Data Quality Flags</h2>
+      <div class="card">
+        <table class="mini-table">
+          <tr><th style="width:25%">Source</th><th>Finding</th><th style="width:15%">Severity</th></tr>
+          <tr>
+            <td>Chargers</td>
+            <td>191 latitude outliers &mdash; one station at 54.3&deg;N (Schleswig-Holstein), well outside BW. Possible geocoding errors that slipped through the Bundesland text filter.</td>
+            <td><span class="flag warn">Warning</span></td>
+          </tr>
+          <tr>
+            <td>Chargers</td>
+            <td>Earliest commissioning date is 1992 &mdash; plausible (pilot) but worth verifying. Only 1 station before 2001.</td>
+            <td><span class="flag ok">Minor</span></td>
+          </tr>
+          <tr>
+            <td>Chargers</td>
+            <td>9,417 rows share exact coordinates (2,054 locations). Expected for multi-charger sites, but inflates station count if not grouped.</td>
+            <td><span class="flag ok">Note</span></td>
+          </tr>
+          <tr>
+            <td>Parking</td>
+            <td>75 sites with capacity = 0. Likely placeholder entries or unmapped street spots.</td>
+            <td><span class="flag warn">Warning</span></td>
+          </tr>
+          <tr>
+            <td>Parking</td>
+            <td>Massive missing data: operator 97%, opening hours 92%, has_fee 32%, type 4.8%. Most fields are unusable for analysis.</td>
+            <td><span class="flag error">High</span></td>
+          </tr>
+          <tr>
+            <td>Parking</td>
+            <td>Only 438 of 28,475 sites (1.5%) report charging capacity. Unreliable for charger-parking correlation.</td>
+            <td><span class="flag warn">Warning</span></td>
+          </tr>
+          <tr>
+            <td>EV Registrations</td>
+            <td>7 municipalities report 0 BEV registrations (smallest: B&ouml;llen with 85 total cars). Very small populations &mdash; genuine zeros, not missing data.</td>
+            <td><span class="flag ok">Note</span></td>
+          </tr>
+          <tr>
+            <td>EV Registrations</td>
+            <td>Walldorf EV share (18.6%) is 3&times; the runner-up. Extreme outlier driven by corporate fleets; may skew models if not controlled.</td>
+            <td><span class="flag warn">Warning</span></td>
+          </tr>
+          <tr>
+            <td>Historic</td>
+            <td><code>max_electric_power</code> is in watts (max 600,000), while charger data uses kW (max 1,200). Unit mismatch between datasets.</td>
+            <td><span class="flag error">High</span></td>
+          </tr>
+          <tr>
+            <td>Population</td>
+            <td>Total 11.09M matches official BW figure. No anomalies detected. Distribution is heavily skewed (expected).</td>
+            <td><span class="flag ok">OK</span></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 13: Data Quality Flags (continued) -->
+  <div class="slide" data-slide="12">
+    <div class="slide-inner">
+      <div class="section-label">Quality</div>
+      <h2>Data Quality Flags (cont.)</h2>
+      <div class="card">
+        <table class="mini-table">
+          <tr><th style="width:25%">Source</th><th>Finding</th><th style="width:15%">Severity</th></tr>
+          <tr>
+            <td>Chargers</td>
+            <td>8,332 exact duplicates (same coords + power + date) &mdash; 44% of all 18,863 records. Multi-connector entries per station; must group by location before counting stations.</td>
+            <td><span class="flag error">High</span></td>
+          </tr>
+          <tr>
+            <td>Chargers</td>
+            <td>129 records with rated power = 0 or NaN. Cannot classify as AC/DC; needs imputation or removal.</td>
+            <td><span class="flag warn">Warning</span></td>
+          </tr>
+          <tr>
+            <td>Chargers</td>
+            <td>6 stations with power &lt; 3 kW (min 1 kW). Suspiciously low &mdash; likely data entry errors or non-public wallboxes.</td>
+            <td><span class="flag warn">Warning</span></td>
+          </tr>
+          <tr>
+            <td>Chargers</td>
+            <td>9 coordinates with &le;2 decimal places (~1 km accuracy). Too imprecise for spatial analysis at street level.</td>
+            <td><span class="flag warn">Warning</span></td>
+          </tr>
+          <tr>
+            <td>Chargers</td>
+            <td>1,087 operators run only 1 station (long tail). Name inconsistencies likely inflate this count (e.g. &ldquo;EnBW&rdquo; appears under 3+ variants).</td>
+            <td><span class="flag ok">Note</span></td>
+          </tr>
+          <tr>
+            <td>Parking</td>
+            <td>P20 Mannheim reports capacity 6,000 &mdash; extreme outlier (next largest: ~2,000). Verify against external source.</td>
+            <td><span class="flag warn">Warning</span></td>
+          </tr>
+          <tr>
+            <td>Parking</td>
+            <td>46% missing addresses, 87% missing fee info, 99% missing coverage/height/stay fields. Only name, capacity, and type are analytically usable.</td>
+            <td><span class="flag error">High</span></td>
+          </tr>
+          <tr>
+            <td>Historic</td>
+            <td><code>chargepoint_static_count</code> is 0 for all 6,031 stations. Column appears broken in the source &mdash; do not use for capacity analysis.</td>
+            <td><span class="flag error">High</span></td>
+          </tr>
+          <tr>
+            <td>Historic</td>
+            <td>99.6% of stations show a chargepoint count mismatch (static &ne; sum of available + charging + out-of-order + inoperative + unknown). Caused by the broken static column.</td>
+            <td><span class="flag error">High</span></td>
+          </tr>
+          <tr>
+            <td>Historic</td>
+            <td>One station reports 253 available chargepoints &mdash; extreme outlier. Likely a charging park or aggregated hub; verify before using as single-station metric.</td>
+            <td><span class="flag warn">Warning</span></td>
+          </tr>
+          <tr>
+            <td>EV Registrations</td>
+            <td>2 municipalities have NaN for all vehicle counts. Missing data, not zero &mdash; exclude from ratio calculations.</td>
+            <td><span class="flag warn">Warning</span></td>
+          </tr>
+          <tr>
+            <td>EV Registrations</td>
+            <td>Sindelfingen has 5,571 PHEV (2nd highest after Stuttgart). Mercedes-Benz HQ &mdash; another corporate fleet outlier alongside Walldorf.</td>
+            <td><span class="flag ok">Note</span></td>
+          </tr>
+          <tr>
+            <td>Cross-dataset</td>
+            <td>Only 22% of BNetzA chargers are within 200 m of a MobiData parking spot. Parking dataset has poor coverage of on-street charger locations.</td>
+            <td><span class="flag warn">Warning</span></td>
+          </tr>
+          <tr>
+            <td>Cross-dataset</td>
+            <td>125 historic stations (2.1%) have no BNetzA match within 1 km. Possible new installations, decommissioned sites, or geocoding drift between sources.</td>
+            <td><span class="flag ok">Note</span></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 14: Power Distribution -->
+  <div class="slide" data-slide="13">
+    <div class="slide-inner">
+      <div class="section-label">Exploratory Analysis</div>
+      <h2>Charging Power Distribution</h2>
+      <p class="desc">Stations &le;50 kW are AC (normal charging). From 50 kW upward it&rsquo;s DC fast charging &mdash; a distinct second mode making up 16.6% of all stations, not statistical noise.</p>
+      <div class="chart-wrap"><canvas id="chartPower"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Slide 15: Commissioning Timeline -->
+  <div class="slide" data-slide="14">
+    <div class="slide-inner">
+      <div class="section-label">Exploratory Analysis</div>
+      <h2>Commissioning Timeline</h2>
+      <p class="desc">Exponential growth since 2018. The 2026 count is partial (data cutoff: 1 Sep 2026). Cumulative line shows the infrastructure doubling roughly every 2.5 years.</p>
+      <div class="chart-wrap"><canvas id="chartTimeline"></canvas></div>
+      <div class="note" style="font-size:0.8rem">Bars show new stations per year; orange line is the cumulative total.</div>
+    </div>
+  </div>
+
+  <!-- Slide 16: Pop vs Charger Density -->
+  <div class="slide" data-slide="15">
+    <div class="slide-inner">
+      <div class="section-label">Exploratory Analysis</div>
+      <h2>Population Density vs Charger Density</h2>
+      <p class="desc">Per district (Kreis). Urban districts cluster top-right; rural districts bottom-left. Outliers: Stuttgart and Heilbronn (city) have disproportionately high charger density.</p>
+      <div class="chart-wrap"><canvas id="chartPopCharger"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Slide 17: EV Share vs Charger Supply -->
+  <div class="slide" data-slide="16">
+    <div class="slide-inner">
+      <div class="section-label">Exploratory Analysis</div>
+      <h2>EV Share vs Charger Supply per District</h2>
+      <p class="desc">Districts with high EV adoption don&rsquo;t always have proportional charger supply. Stuttgart leads both axes. B&ouml;blingen (EV share 10.2%) is well-served; Alb-Donau-Kreis (31 chargers/10k pop) overperforms on supply relative to its 4.8% EV share.</p>
+      <div class="chart-wrap"><canvas id="chartEvCharger"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Slide 18: Cross-dataset Consistency -->
+  <div class="slide" data-slide="17">
+    <div class="slide-inner">
+      <div class="section-label">Cross-dataset</div>
+      <h2>Cross-dataset Consistency</h2>
+      <div class="two-col">
+        <div class="card">
+          <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Chargers vs Historic Stations</h3>
+          <p class="desc" style="font-size:0.85rem">Spatial match between BNetzA register (18,863) and MobiData BW snapshot (6,031) within proximity thresholds.</p>
+          <div class="stat-row">
+            <div class="stat"><div class="val">85.5%</div><div class="label">Within 100 m</div></div>
+            <div class="stat"><div class="val">95.8%</div><div class="label">Within 500 m</div></div>
+            <div class="stat"><div class="val">255</div><div class="label">No match</div></div>
+          </div>
+          <div class="note" style="font-size:0.8rem">Historic dataset is smaller (10 providers vs all). 4.2% unmatched stations likely from providers not in MobiData.</div>
+        </div>
+        <div class="card">
+          <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Chargers near Parking</h3>
+          <p class="desc" style="font-size:0.85rem">How many of 18,863 charger locations are within proximity of a known parking site?</p>
+          <div class="stat-row">
+            <div class="stat"><div class="val">15.7%</div><div class="label">Within 100 m</div></div>
+            <div class="stat"><div class="val">39.6%</div><div class="label">Within 500 m</div></div>
+            <div class="stat"><div class="val">60.4%</div><div class="label">No nearby parking</div></div>
+          </div>
+          <div class="note" style="font-size:0.8rem">Most chargers are not near mapped parking. Could indicate curbside charging, private lots, or incomplete parking data.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 19: Spatial Sanity -->
+  <div class="slide" data-slide="18">
+    <div class="slide-inner">
+      <div class="section-label">Quality</div>
+      <h2>Spatial Sanity Check</h2>
+      <p class="desc">Bounding-box test: how many points fall outside Baden-W&uuml;rttemberg&rsquo;s extent (47.53&ndash;49.79&deg;N, 7.51&ndash;10.50&deg;E)?</p>
+      <div class="card">
+        <table class="mini-table">
+          <tr><th>Dataset</th><th>Total</th><th>Outside BW bbox</th><th>Lat range</th><th>Lon range</th><th>Status</th></tr>
+          <tr><td>Chargers</td><td>18,863</td><td>126</td><td>47.55 &ndash; 54.32</td><td>7.36 &ndash; 10.44</td><td><span class="flag warn">126 outside</span></td></tr>
+          <tr><td>Population</td><td>21,926</td><td>0</td><td>47.54 &ndash; 49.78</td><td>7.53 &ndash; 10.47</td><td><span class="flag ok">Clean</span></td></tr>
+          <tr><td>Parking</td><td>28,475</td><td>0</td><td>47.55 &ndash; 49.79</td><td>7.52 &ndash; 10.44</td><td><span class="flag ok">Clean</span></td></tr>
+          <tr><td>Historic</td><td>6,031</td><td>0</td><td>47.55 &ndash; 49.79</td><td>7.52 &ndash; 10.44</td><td><span class="flag ok">Clean</span></td></tr>
+        </table>
+      </div>
+      <div class="note" style="margin-top:0.75rem">
+        <strong>Charger outliers:</strong> 126 stations have coordinates outside BW despite <code>Bundesland = "Baden-W&uuml;rttemberg"</code>. The worst is at 54.32&deg;N (northern Germany). These are geocoding errors in the BNetzA source &mdash; filter by geometry, not just text field.
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 20: Completeness Matrix -->
+  <div class="slide" data-slide="19">
+    <div class="slide-inner">
+      <div class="section-label">Quality</div>
+      <h2>Field Completeness Matrix</h2>
+      <p class="desc">Percentage of non-null values per field. Green = &gt;80%, yellow = 20&ndash;80%, red = &lt;20%. Only selected fields shown.</p>
+      <div class="card" id="completenessCard" style="overflow-x:auto"></div>
+    </div>
+  </div>
+
+  <!-- Slide 21: Historic Weekly Time Series -->
+  <div class="slide" data-slide="20">
+    <div class="slide-inner">
+      <div class="section-label">Temporal</div>
+      <h2>Historic Data: Weekly Row Counts</h2>
+      <p class="desc">The week-34 drop is clearly visible: rows fall from ~16M to ~1.6M. This is the platform-side archiving change (change-only deltas). Week 38 is anomalous (102k stations reported).</p>
+      <div class="chart-wrap"><canvas id="chartWeekly"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Slide 22: Limitations -->
+  <div class="slide" data-slide="21">
+    <div class="slide-inner">
+      <div class="section-label">Caveats</div>
+      <h2>Known Limitations</h2>
+      <div class="card">
+        <ul>
+          <li><strong>Temporal mismatch:</strong> KBA vehicle data (Oct 2024) lags ~2 years behind charging data (Sep 2026). EV adoption has likely grown.</li>
+          <li style="margin-top:0.6rem"><strong>Boundary edition:</strong> VG250 is from 2020; municipal mergers since may cause join mismatches.</li>
+          <li style="margin-top:0.6rem"><strong>Historic coverage bias:</strong> MobiData BW feed favors networks with live feeds; smaller operators may be underrepresented.</li>
+          <li style="margin-top:0.6rem"><strong>Street parking completeness:</strong> ON_STREET data comes from specific municipal surveys, not a comprehensive BW-wide census.</li>
+          <li style="margin-top:0.6rem"><strong>Not yet integrated:</strong> KBA FZ 13 (vehicle classes), KBA 5 km EV grid (fine-grained EV share).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 23: Analysis Methods -->
+  <div class="slide" data-slide="22">
+    <div class="slide-inner">
+      <div class="section-label">Methods</div>
+      <h2>Planned Analysis Methods</h2>
+      <div class="two-col">
+        <div class="card">
+          <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Spatial Analysis</h3>
+          <ul>
+            <li><strong>Gap analysis:</strong> Overlay charger density vs demand proxies (population, EV share) per district to find underserved areas</li>
+            <li style="margin-top:0.5rem"><strong>Clustering:</strong> DBSCAN or k-means on charger locations to identify coverage clusters and spatial gaps</li>
+            <li style="margin-top:0.5rem"><strong>Spatial autocorrelation:</strong> Moran&rsquo;s I to test whether charger placement correlates with demand or is spatially random</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Scoring &amp; Utilization</h3>
+          <ul>
+            <li><strong>Weighted scoring model:</strong> Rank candidate locations (parking sites without nearby chargers) by population density + EV share + distance to nearest charger</li>
+            <li style="margin-top:0.5rem"><strong>Historic utilization:</strong> Use MobiData availability snapshots to identify high-demand stations (low availability = high usage), then characterize what makes those locations attractive</li>
+          </ul>
+        </div>
+      </div>
+      <div class="note" style="margin-top:0.75rem;font-size:0.85rem">All methods use scikit-learn, geopandas, and scipy &mdash; already in the project stack. Results feed into the Leaflet map as a recommendation layer.</div>
+    </div>
+  </div>
+
+  <!-- Slide 24: Planned Analysis Method 2 — Placement Optimization -->
+  <div class="slide" data-slide="23">
+    <div class="slide-inner">
+      <div class="section-label">Methods</div>
+      <h2>Placement Optimization Pipeline</h2>
+      <p class="desc" style="margin-bottom:0.5rem"><strong>Input:</strong> <em>k</em> stations to build. <code>k = Budget &div; Price-per-CS-Type</code> (prices scraped &amp; averaged, updated monthly).</p>
+
+      <div class="card" style="margin-bottom:0.4rem;padding:0.6rem 0.8rem">
+        <h3 style="font-size:0.85rem;margin-bottom:0.3rem;color:var(--accent)">Level 0 &mdash; Baseline &amp; Benchmark</h3>
+        <table class="mini-table" style="font-size:0.78rem">
+          <tr><th style="width:6%"></th><th style="width:22%">Component</th><th>Description</th></tr>
+          <tr><td><strong>A0</strong></td><td>Demand grid</td><td>5 km grid with <code>EV-share &times; Population</code>. Superimpose existing CS.</td></tr>
+          <tr><td><strong>B0</strong></td><td>Greedy max-coverage</td><td>Radius <em>R</em> around existing CS = covered. Max &Sigma;&nbsp;demand&nbsp;&times;&nbsp;covered, s.t. &le;<em>k</em> new sites.</td></tr>
+          <tr><td><strong>C</strong></td><td>Evaluation</td><td>Compare against recent installations as ground truth.</td></tr>
+        </table>
+      </div>
+
+      <div class="card" style="margin-bottom:0.4rem;padding:0.6rem 0.8rem">
+        <h3 style="font-size:0.85rem;margin-bottom:0.3rem;color:var(--accent)">Level 1 &mdash; Exact Optimization</h3>
+        <table class="mini-table" style="font-size:0.78rem">
+          <tr><th style="width:6%"></th><th style="width:22%">Component</th><th>Description</th></tr>
+          <tr><td><strong>A1</strong></td><td>Better demand</td><td>Add weights: house/apartment density, POI proximity, literature-backed factors.</td></tr>
+          <tr><td><strong>B1</strong></td><td>Exact solver</td><td>Replace greedy with HiGHS / OR-Tools / PuLP (open-source mathematical optimization).</td></tr>
+        </table>
+      </div>
+
+      <div class="card" style="padding:0.6rem 0.8rem">
+        <h3 style="font-size:0.85rem;margin-bottom:0.3rem;color:var(--accent)">Level 2 &mdash; ML-based</h3>
+        <table class="mini-table" style="font-size:0.78rem">
+          <tr><th style="width:6%"></th><th style="width:22%">Component</th><th>Description</th></tr>
+          <tr><td><strong>A2</strong></td><td>ML demand</td><td>XGBoost / Gradient Boosting. Features: population, EV density, home-charging gap, POIs, road class, traffic, station attrs, local context.</td></tr>
+          <tr><td><strong>B2</strong></td><td>Spatial placement</td><td>Spatial search models with competition &amp; road-distance. Needs further research.</td></tr>
+        </table>
+        <div class="note" style="margin-top:0.3rem;font-size:0.75rem"><strong>Limitations:</strong> endogeneity &amp; selection bias &mdash; stations placed <em>because</em> demand exists biases training data.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 25: Project Roadmap -->
+  <div class="slide" data-slide="24">
+    <div class="slide-inner">
+      <div class="section-label">Roadmap</div>
+      <h2>Project Roadmap</h2>
+      <div class="card">
+        <table class="mini-table">
+          <tr><th style="width:30%">Phase</th><th style="width:15%">Status</th><th>Details</th></tr>
+          <tr>
+            <td><strong>Data collection</strong></td>
+            <td><span class="flag ok">Done</span></td>
+            <td>6 sources, automated pipeline (<code>extract.py</code>), 33 GB raw &rarr; 44 MB processed</td>
+          </tr>
+          <tr>
+            <td><strong>Data quality / EDA</strong></td>
+            <td><span class="badge">In progress</span></td>
+            <td>Completeness matrix, outlier detection, cross-dataset consistency, spatial sanity checks</td>
+          </tr>
+          <tr>
+            <td><strong>Feature engineering</strong></td>
+            <td><span class="flag warn">Next</span></td>
+            <td>Demand score per grid cell, coverage gap metrics, utilization features from historic data</td>
+          </tr>
+          <tr>
+            <td><strong>Model / scoring</strong></td>
+            <td><span class="flag warn">Next</span></td>
+            <td>Weighted placement model, clustering, spatial autocorrelation analysis</td>
+          </tr>
+          <tr>
+            <td><strong>Map visualization</strong></td>
+            <td><span class="badge">In progress</span></td>
+            <td>Leaflet map with data layers live; needs model output / recommendation layer</td>
+          </tr>
+          <tr>
+            <td><strong>Validation</strong></td>
+            <td><span class="flag" style="background:var(--border);color:var(--fg-muted)">Planned</span></td>
+            <td>Compare recommendations against recent 2025&ndash;2026 installations as ground truth</td>
+          </tr>
+          <tr>
+            <td><strong>Report &amp; presentation</strong></td>
+            <td><span class="flag" style="background:var(--border);color:var(--fg-muted)">Planned</span></td>
+            <td>Final deliverable: interactive webapp, video, documentation</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 26: End -->
+  <div class="slide" data-slide="25">
+    <div class="slide-inner slide-title">
+      <h1>Thank You</h1>
+      <div class="divider"></div>
+      <p class="subtitle">DS500 Data Science Project &middot; DHBW &middot; Winter Term 2026/2027</p>
+      <p class="meta" style="margin-top:0.5rem">All data sources are openly licensed German public data.</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- Click zones -->
+<div class="click-zone left" id="clickLeft"></div>
+<div class="click-zone right" id="clickRight"></div>
+
+<!-- Navigation bar -->
+<div class="nav-bar">
+  <button class="nav-btn" id="prevBtn">&larr; Prev</button>
+  <div class="dots" id="dots"></div>
+  <span class="slide-counter" id="counter"></span>
+  <button class="nav-btn" id="nextBtn">Next &rarr;</button>
+</div>
+
+<script>
+  // --- Navigation ---
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length;
+  let current = 0;
+  const dotsEl = document.getElementById('dots');
+  const counterEl = document.getElementById('counter');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+
+  for (let i = 0; i < total; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 0 ? ' active' : '');
+    d.addEventListener('click', () => goTo(i));
+    dotsEl.appendChild(d);
+  }
+
+  const initialized = new Set();
+  function goTo(n) {
+    if (n < 0 || n >= total) return;
+    slides[current].classList.remove('active');
+    dotsEl.children[current].classList.remove('active');
+    current = n;
+    slides[current].classList.add('active');
+    dotsEl.children[current].classList.add('active');
+    counterEl.textContent = (current + 1) + ' / ' + total;
+    prevBtn.disabled = current === 0;
+    nextBtn.disabled = current === total - 1;
+    // Lazy-init charts on first visit, resize on revisit
+    requestAnimationFrame(() => {
+      if (!initialized.has(n) && chartInits[n]) {
+        chartInits[n]();
+        initialized.add(n);
+      }
+      slides[current].querySelectorAll('canvas').forEach(c => {
+        const ch = Chart.getChart(c);
+        if (ch) ch.resize();
+      });
+    });
+  }
+  function next() { goTo(current + 1); }
+  function prev() { goTo(current - 1); }
+  prevBtn.addEventListener('click', prev);
+  nextBtn.addEventListener('click', next);
+  document.getElementById('clickLeft').addEventListener('click', prev);
+  document.getElementById('clickRight').addEventListener('click', next);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); next(); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+    if (e.key === 'Home') { e.preventDefault(); goTo(0); }
+    if (e.key === 'End') { e.preventDefault(); goTo(total - 1); }
+  });
+  let touchX = 0;
+  document.addEventListener('touchstart', (e) => { touchX = e.changedTouches[0].screenX; });
+  document.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].screenX - touchX;
+    if (Math.abs(dx) > 50) { dx < 0 ? next() : prev(); }
+  });
+
+  // --- Chart theme ---
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const cAccent = isDark ? '#6dbf8b' : '#2d5a3d';
+  const cAccent2 = isDark ? '#8ecfaa' : '#4a8d64';
+  const cMuted = isDark ? '#9a9590' : '#6b6560';
+  const cBorder = isDark ? '#2e2c29' : '#e2ddd8';
+  const cWarn = isDark ? '#ffc107' : '#e6a200';
+  const cError = isDark ? '#f5867a' : '#dc3545';
+
+  Chart.defaults.color = cMuted;
+  Chart.defaults.borderColor = cBorder;
+  Chart.defaults.font.family = "'DM Sans', system-ui, sans-serif";
+  Chart.defaults.font.size = 12;
+  Chart.defaults.plugins.legend.labels.usePointStyle = true;
+
+  // Shared data
+  const popLabels = ["Stuttgart","Böblingen","Esslingen","Göppingen","Ludwigsburg","Rems-Murr","Heilbronn (city)","Heilbronn","Hohenlohe","Schwäb. Hall","Main-Tauber","Heidenheim","Ostalb","Baden-Baden","Karlsruhe (city)","Karlsruhe","Rastatt","Heidelberg","Mannheim","Neckar-Odenwald","Rhein-Neckar","Pforzheim","Calw","Enzkreis","Freudenstadt","Freiburg","Breisgau-HSW","Emmendingen","Ortenau","Rottweil","Schwarzwald-Baar","Tuttlingen","Konstanz","Lörrach","Waldshut","Reutlingen","Tübingen","Zollernalb","Ulm","Alb-Donau","Biberach","Bodensee","Ravensburg","Sigmaringen"];
+
+  // Map slide index → init function (lazy chart creation)
+  const chartInits = {
+    13: () => {
+      new Chart(document.getElementById('chartPower'), {
+        type: 'bar',
+        data: {
+          labels: ['≤11 kW','12–22 kW','23–50 kW','51–100 kW','101–150 kW','151–300 kW','301–500 kW','500+ kW'],
+          datasets: [{
+            label: 'Stations',
+            data: [2217, 6424, 6618, 728, 765, 1493, 477, 12],
+            backgroundColor: [cAccent,cAccent,cAccent,cWarn,cWarn,cWarn,cError,cError],
+            borderRadius: 4,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y.toLocaleString() + ' stations' } } },
+          scales: { y: { beginAtZero: true, title: { display: true, text: 'Stations' }, grid: { color: cBorder } }, x: { grid: { display: false } } }
+        }
+      });
+    },
+    14: () => {
+      new Chart(document.getElementById('chartTimeline'), {
+        type: 'bar',
+        data: {
+          labels: ['1992','2001','2008','2010','2011','2012','2013','2014','2015','2016','2017','2018','2019','2020','2021','2022','2023','2024','2025','2026'],
+          datasets: [
+            { label: 'New per year', data: [1,1,1,3,10,46,11,35,45,169,160,647,784,1210,1722,3017,3919,2772,2862,1448], backgroundColor: cAccent, borderRadius: 3, order: 2 },
+            { label: 'Cumulative', data: [1,2,3,6,16,62,73,108,153,322,482,1129,1913,3123,4845,7862,11781,14553,17415,18863], type: 'line', borderColor: cWarn, backgroundColor: 'transparent', pointRadius: 2, borderWidth: 2, yAxisID: 'y1', order: 1 }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'top' } },
+          scales: {
+            y: { beginAtZero: true, title: { display: true, text: 'New per year' }, grid: { color: cBorder } },
+            y1: { beginAtZero: true, position: 'right', title: { display: true, text: 'Cumulative' }, grid: { display: false } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    },
+    15: () => {
+      const popDens = [2889.5,635.2,822.5,397.2,774.0,512.1,4725.6,432.8,147.0,133.0,101.5,213.2,208.3,406.3,4348.6,698.0,311.2,1418.2,2149.9,128.4,524.3,1359.8,199.4,345.2,137.8,1536.1,192.6,245.3,235.0,180.6,205.2,194.5,344.5,283.8,144.9,264.5,442.4,208.6,1029.4,143.5,144.2,305.9,175.3,108.8];
+      const chDens = [11.0,1.76,1.14,0.66,1.04,0.68,10.56,0.97,0.36,0.21,0.19,0.21,0.3,0.76,5.19,0.83,0.44,3.71,3.25,0.17,0.59,1.87,0.33,0.37,0.23,3.09,0.28,0.39,0.39,0.25,0.26,0.25,0.51,0.32,0.2,0.33,0.74,0.16,2.89,0.44,0.12,0.53,0.38,0.1];
+      new Chart(document.getElementById('chartPopCharger'), {
+        type: 'scatter',
+        data: { datasets: [{ label: 'Districts', data: popDens.map((p, i) => ({ x: p, y: chDens[i] })), backgroundColor: cAccent + 'aa', borderColor: cAccent, pointRadius: 5, pointHoverRadius: 7 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => popLabels[c.dataIndex] + ': pop ' + c.parsed.x.toLocaleString() + '/km², chargers ' + c.parsed.y + '/km²' } } },
+          scales: { x: { title: { display: true, text: 'Population density (per km²)' }, grid: { color: cBorder } }, y: { title: { display: true, text: 'Charger density (per km²)' }, grid: { color: cBorder } } }
+        }
+      });
+    },
+    16: () => {
+      const evShare = [11.3,10.21,7.05,5.16,6.26,5.83,5.11,5.69,5.74,5.04,4.24,3.96,4.91,6.33,6.89,5.33,5.56,6.34,6.18,4.36,7.35,5.58,5.95,5.5,4.81,6.04,5.18,4.67,4.6,4.83,4.88,5.33,5.37,5.25,5.22,5.31,5.64,4.63,6.48,4.84,4.96,6.22,5.14,4.39];
+      const ch10k = [38.1,27.7,13.9,16.6,13.5,13.4,22.3,22.3,24.8,15.9,19.0,10.0,14.4,18.8,11.9,11.9,14.3,26.2,15.1,13.1,11.3,13.8,16.6,10.6,16.7,20.1,14.6,15.7,16.6,13.7,12.6,12.8,14.8,11.2,13.9,12.5,16.7,7.5,28.0,31.0,8.3,17.4,21.5,9.1];
+      new Chart(document.getElementById('chartEvCharger'), {
+        type: 'scatter',
+        data: { datasets: [{ label: 'Districts', data: evShare.map((e, i) => ({ x: e, y: ch10k[i] })), backgroundColor: cAccent2 + 'aa', borderColor: cAccent2, pointRadius: 5, pointHoverRadius: 7 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => popLabels[c.dataIndex] + ': EV ' + c.parsed.x + '%, ' + c.parsed.y + ' chargers/10k' } } },
+          scales: { x: { title: { display: true, text: 'EV share (BEV+PHEV, %)' }, grid: { color: cBorder } }, y: { title: { display: true, text: 'Chargers per 10,000 residents' }, grid: { color: cBorder } } }
+        }
+      });
+    },
+    19: () => {
+      // Completeness heatmap (HTML table, not a chart)
+      const compData = {
+        'Chargers': { 'ID':100,'Operator':100,'Power':100,'Date':100,'Address':100,'Lat/Lon':100,'Payment':90.2,'Display name':38.6,'Hours detail':30.2,'Parking info':45.2,'Connector 2':75.5,'Connector 3':6.3,'EVSE-ID':29.8 },
+        'Parking': { 'Name':98.8,'Type':95.2,'Capacity':100,'Address':53.9,'Has fee':68.0,'Operator':2.6,'Hours':7.6,'Lighting':4.8,'Covered':0.3,'Charging cap.':1.5,'Disabled cap.':14.8,'Fee desc.':12.6 },
+        'EV Municip.': { 'AGS':100,'Name':100,'Total cars':99.8,'BEV':99.8,'PHEV':99.8 },
+        'Historic': { 'ID':100,'Operator':100,'Address':100,'Source':100,'Power':100,'Available':100,'Charging':100,'Out of order':100,'Name':84.9 }
+      };
+      const card = document.getElementById('completenessCard');
+      const allFields = new Set();
+      const dsNames = Object.keys(compData);
+      dsNames.forEach(ds => Object.keys(compData[ds]).forEach(f => allFields.add(f)));
+      const fields = [...allFields];
+      let h = '<table class="mini-table" style="font-size:0.75rem"><tr><th></th>';
+      dsNames.forEach(ds => { h += '<th style="text-align:center;min-width:70px">' + ds + '</th>'; });
+      h += '</tr>';
+      fields.forEach(f => {
+        h += '<tr><td style="white-space:nowrap">' + f + '</td>';
+        dsNames.forEach(ds => {
+          const v = compData[ds]?.[f];
+          if (v === undefined) {
+            h += '<td style="text-align:center;background:var(--bg);color:var(--fg-muted)">—</td>';
+          } else {
+            const bg = v >= 80 ? (isDark ? '#1e2e24' : '#e8f0eb') : v >= 20 ? (isDark ? '#3d3520' : '#fef3cd') : (isDark ? '#3d1c20' : '#f8d7da');
+            const fg = v >= 80 ? cAccent : v >= 20 ? cWarn : cError;
+            h += '<td style="text-align:center;background:' + bg + ';color:' + fg + ';font-weight:500;font-family:var(--font-mono)">' + v + '%</td>';
+          }
+        });
+        h += '</tr>';
+      });
+      h += '</table>';
+      card.innerHTML = h;
+    },
+    20: () => {
+      const weeklyData = [
+        {w:'W05',r:11.0},{w:'W06',r:17.8},{w:'W07',r:18.1},{w:'W08',r:18.0},{w:'W09',r:17.2},
+        {w:'W10',r:18.0},{w:'W11',r:18.0},{w:'W12',r:17.9},{w:'W13',r:20.8},{w:'W14',r:22.3},
+        {w:'W15',r:22.1},{w:'W16',r:22.5},{w:'W17',r:19.4},{w:'W18',r:13.9},{w:'W19',r:20.1},
+        {w:'W20',r:19.0},{w:'W21',r:20.7},{w:'W22',r:16.0},{w:'W23',r:17.7},{w:'W24',r:17.5},
+        {w:'W25',r:27.9},{w:'W26',r:21.5},{w:'W27',r:21.7},{w:'W28',r:21.1},{w:'W29',r:17.0},
+        {w:'W30',r:20.0},{w:'W31',r:13.7},{w:'W32',r:24.0},{w:'W33',r:16.0},
+        {w:'W34',r:1.6},{w:'W35',r:1.7},{w:'W36',r:1.7},{w:'W37',r:1.6},
+        {w:'W38',r:2.1},{w:'W39',r:1.9},{w:'W40',r:7.4}
+      ];
+      new Chart(document.getElementById('chartWeekly'), {
+        type: 'bar',
+        data: {
+          labels: weeklyData.map(d => d.w),
+          datasets: [{ label: 'Rows (millions)', data: weeklyData.map(d => d.r), backgroundColor: weeklyData.map(d => d.w === 'W34' ? cError : d.w === 'W38' ? cWarn : cAccent), borderRadius: 2 }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y.toFixed(1) + 'M rows' } } },
+          scales: { y: { beginAtZero: true, title: { display: true, text: 'Rows (millions)' }, grid: { color: cBorder } }, x: { grid: { display: false }, ticks: { maxRotation: 90, font: { size: 10 } } } }
+        }
+      });
+    }
+  };
+
+  goTo(0);
+</script>
+
+</body>
+</html>

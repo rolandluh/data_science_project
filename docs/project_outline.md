@@ -70,4 +70,29 @@ interest, and potential demand for electric vehicles. Recommend optimal charging
 locations under budget and infrastructure constraints, and evaluate different deployment 
 strategies. 
 
+## Analysis Methods
+
+### Spatial Analysis
+- **Gap analysis:** Overlay charger density vs demand proxies (population density, EV share) per district/municipality to identify underserved areas
+- **Clustering:** DBSCAN or k-means on charger locations to identify coverage clusters and spatial gaps
+- **Spatial autocorrelation:** Moran's I to test whether charger placement correlates with demand or is spatially random
+
+### Scoring & Utilization
+- **Weighted scoring model:** Rank candidate locations (e.g. parking sites without nearby chargers) by population density + EV share + distance to nearest charger — simple, explainable, good for a first pass
+- **Historic utilization analysis:** Use MobiData BW availability snapshots to identify high-demand stations (low availability = high usage), then characterize what makes those locations attractive
+
+All methods use scikit-learn, geopandas, and scipy (already in the project stack). Results feed into the Leaflet map as a recommendation layer.
+
+## Project Roadmap
+
+| Phase | Status | Details |
+|-------|--------|---------|
+| Data collection | Done | 6 sources, automated pipeline (`extract.py`), 33 GB raw → 44 MB processed |
+| Data quality / EDA | Done | Completeness matrix, outlier detection, cross-dataset consistency, spatial sanity checks |
+| Feature engineering | Next | Demand score per grid cell, coverage gap metrics, utilization features from historic data |
+| Model / scoring | Next | Weighted placement model, clustering, spatial autocorrelation analysis |
+| Map visualization | In progress | Leaflet map with data layers live; needs model output / recommendation layer |
+| Validation | Planned | Compare recommendations against recent 2025–2026 installations as ground truth |
+| Report & presentation | Planned | Final deliverable: interactive webapp, video, documentation |
+
  
