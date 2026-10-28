@@ -34,6 +34,7 @@ GEMEINDEN_OUT = Path("data/processed/gemeinden_ev.geojson")
 
 PARK_URL = "https://api.mobidata-bw.de/geoserver/MobiData-BW/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=MobiData-BW%3Apark-api_car&cql_filter=type%3C%3E%27ON_STREET%27%20OR%20type%20is%20NULL&maxFeatures=30000&outputFormat=csv"
 PARK_CSV_PATH = Path("data/raw/parkplaetze_bw_wfs.csv")
+STREET_PARK_CSV_PATH = Path("data/raw/park-api_car.csv")
 PARK_OUT = Path("data/processed/parkplaetze_bw.geojson")
 HIST_DIR = Path("data/raw/historie")
 HIST_CSV = HIST_DIR / "20261018_ladesaeulen.csv.gz"
@@ -164,13 +165,40 @@ def save_ev_municipalities():
     print(f"{gemeinden['bev'].notna().sum()} of {len(gemeinden)} municipalities with EV counts saved to {GEMEINDEN_OUT}")
 
 
+def _load_parking_csv(path, columns):
+    """Read a parking CSV and return a GeoDataFrame with the given columns."""
+    df = pd.read_csv(path, low_memory=False)
+    # Keep only rows that have a parseable geometry
+    df = df[df["geometry"].notna()]
+    present = [c for c in columns if c in df.columns]
+    gdf = gpd.GeoDataFrame(df[present], geometry=gpd.GeoSeries.from_wkt(df["geometry"]), crs="EPSG:4326")
+    # Fill missing columns so both sources share the same schema
+    for c in columns:
+        if c not in gdf.columns:
+            gdf[c] = None
+    return gdf[columns + ["geometry"]]
+
+
 def save_parking():
     if not PARK_CSV_PATH.exists():
         urllib.request.urlretrieve(PARK_URL, PARK_CSV_PATH)
 
-    parking = pd.read_csv(PARK_CSV_PATH, low_memory=False)
-    # Geometry is WKT, e.g. "POINT (8.40 48.98)"
-    parking = gpd.GeoDataFrame(parking[PARK_COLUMNS], geometry=gpd.GeoSeries.from_wkt(parking["geometry"]), crs="EPSG:4326")
+    off_street = _load_parking_csv(PARK_CSV_PATH, PARK_COLUMNS)
+
+    # Street parking (ON_STREET) from a separate download
+    if STREET_PARK_CSV_PATH.exists():
+        street = _load_parking_csv(STREET_PARK_CSV_PATH, PARK_COLUMNS)
+        # Carry FID through for dedup; _load_parking_csv doesn't include it
+        off_street["_fid"] = pd.read_csv(PARK_CSV_PATH, low_memory=False, usecols=["FID"])["FID"].values
+        street["_fid"] = pd.read_csv(STREET_PARK_CSV_PATH, low_memory=False, usecols=["FID"])["FID"].values
+        parking = pd.concat([off_street, street], ignore_index=True)
+        # Drop duplicates that appear in both downloads (same FID)
+        parking = gpd.GeoDataFrame(parking.drop_duplicates("_fid", keep="first").drop(columns="_fid"), crs="EPSG:4326")
+        print(f"  off-street: {len(off_street)}, street: {len(street)}, after dedup: {len(parking)}")
+    else:
+        parking = off_street
+        print("  street parking file not found, using off-street only")
+
     # The download also contains points outside Baden-Württemberg; keep only those inside its outline
     states = gpd.read_file(STATES_OUT)
     bw = states[states["AGS"] == "08"]
