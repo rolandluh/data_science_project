@@ -20,11 +20,24 @@ My priority is roads/traffic, the 5 km EV grid and OSM POIs. The others can wait
 
 ## overall todos
 
+**Housekeeping (now)**
+- Create a branch and commit or stash the dirty `app/` and `CLAUDE.md` changes. They're sitting on `main`, and the last commit says the map is "buggy right now".
+- Find and fix the map bugs.
+- Add `parkplaetze_osm_bw.geojson` (`save_osm_parking()`) to the CLAUDE.md pipeline table.
+- Check what `test.py` is. Move it into a tests folder or remove it.
+- Remove the Zensus API key from the team's data-source note.
+- Commit `docs/project_outline.md` (related work) and `todos.md`.
+
 **Data**
 - Integrate the KBA 5 km EV grid.
 - Add roads/traffic and OSM POIs (see the data section above).
 - Update the VG250 boundaries, which are from 2020. Municipal mergers may break joins.
 - Add a pipeline step that checks outputs and reports implausible values. The course requires automated validation.
+
+**Historic data**
+- Decide how to handle the W34 drop and the W38 anomaly in the utilization features: use only W26–W33, or normalize.
+- Cast numeric parquet columns to reduce the ~44 GB.
+- Document the coverage bias (about ⅓ of stations, larger networks) as a limitation.
 
 **Model (the main gap, nothing exists yet)**
 - Fixed grid and feature table: demand score, coverage gap, utilization.
