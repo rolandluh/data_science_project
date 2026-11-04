@@ -16,22 +16,6 @@
   <div id="map"></div>
   <div id="dock">
     <label>
-      Population heatmap
-      <input id="population" type="checkbox">
-    </label>
-    <label>
-      EV cars by municipality
-      <input id="ev" type="checkbox">
-    </label>
-    <label>
-      Parking spots (MobiData)
-      <input id="parking" type="checkbox" checked>
-    </label>
-    <label>
-      Parking spots (OSM)
-      <input id="parking-osm" type="checkbox">
-    </label>
-    <label>
       Study area
       <select id="region">
         <option value="circle">Circle on map</option>
@@ -54,6 +38,23 @@
       <input id="access" type="number" min="1" max="20" value="10">
     </label>
   </div>
+  <aside id="layers">
+    <h2>Layers</h2>
+    <h3>Charging stations</h3>
+    <label class="switch-row"><span>Register only</span><span class="switch"><input id="show-register" type="checkbox" checked><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Register + historic</span><span class="switch"><input id="show-matched" type="checkbox" checked><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Historic only</span><span class="switch"><input id="show-historic" type="checkbox" checked><span class="knob"></span></span></label>
+    <h3>Parking</h3>
+    <label class="switch-row"><span>MobiData</span><span class="switch"><input id="parking" type="checkbox" checked><span class="knob"></span></span></label>
+    <label class="switch-row"><span>OpenStreetMap</span><span class="switch"><input id="parking-osm" type="checkbox"><span class="knob"></span></span></label>
+    <h3>Context</h3>
+    <label class="switch-row"><span>Population heatmap</span><span class="switch"><input id="population" type="checkbox"><span class="knob"></span></span></label>
+    <label class="switch-row"><span>EV cars by municipality</span><span class="switch"><input id="ev" type="checkbox"><span class="knob"></span></span></label>
+    <h3>Map</h3>
+    <label class="switch-row"><span>Study area</span><span class="switch"><input id="show-area" type="checkbox" checked><span class="knob"></span></span></label>
+    <label class="switch-row"><span>State borders</span><span class="switch"><input id="show-borders" type="checkbox" checked><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Legend</span><span class="switch"><input id="show-legend" type="checkbox" checked><span class="knob"></span></span></label>
+  </aside>
   <div id="zoom-slider">
     <input id="zoom" type="range" min="6" max="19" step="1">
   </div>

@@ -4,12 +4,6 @@
 
 EV charging station placement optimization for Baden-Württemberg. Interactive Leaflet web map + Python data pipeline. University project (DS500, Winter 2026/2027) — team: Arun, Marko, Roland.
 
-## Tech stack
-
-- **Frontend:** Static HTML/JS/CSS with Leaflet + OpenStreetMap tiles (`app/`)
-- **Backend/pipeline:** Python 3.14, pandas, geopandas, openpyxl, scikit-learn, matplotlib
-- **Data:** Raw downloads in `data/raw/` (git-ignored), processed outputs in `data/processed/` (git-ignored), shared via external folder
-
 ## Key commands
 
 ```bash
@@ -47,16 +41,6 @@ Each `save_*()` function skips if its output file already exists. Delete the out
 - **Data drop at week 34 (17 Aug 2026):** Platform-side archiving change — polling interval doubled, snapshots switched to change-only deltas. Not a data loss. See `docs/comparison_report_historic_mobidata.md`
 - Week 38 is an anomaly (102k stations, 1404 min gap)
 - All columns stored as strings in parquet — casting numerics would improve compression
-
-## File layout
-
-```
-app/              Web frontend (index.html, app.js, style.css)
-data/raw/         Downloaded sources (git-ignored)
-data/processed/   Pipeline outputs (git-ignored)
-docs/             Reports and project outline
-src/              Python pipeline and (empty) placeholder modules
-```
 
 ## Git
 

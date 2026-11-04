@@ -83,6 +83,42 @@ strategies.
 
 All methods use scikit-learn, geopandas, and scipy (already in the project stack). Results feed into the Leaflet map as a recommendation layer.
 
+## Related Work
+
+### Existing tools
+
+| Tool | Type | Notes |
+|------|------|-------|
+| [StandortTOOL](https://www.standorttool.de) (NOW GmbH / Nationale Leitstelle Ladeinfrastruktur) | National demand forecast, free for municipalities | Closest competitor, see below |
+| [EVPLAN](https://www.sciencedirect.com/science/article/pii/S2226585626000403) | GIS multi-criteria decision support | Scores hexagonal grid cells, heatmap output. Similar to our weighted scoring |
+| [US DOE EVGrid Assist](https://www.energy.gov/cmei/vehicles/evgrid-assist-resources-reports-and-tools) | Government tool collection (REVISE-II, EVI-EnSite, EVI-Equity) | Corridor gaps and equity analysis for the US |
+| [futuretide/ev-charging-optimizer](https://github.com/futuretide/ev-charging-optimizer) | Open source, integer programming (Pyomo) | Washington D.C., Streamlit/Folium app |
+| [Voronoi + greedy write-up](https://joelfernandezroman.github.io/machine-learning/spec-udg-geo.html) | Student project | Same stack as ours (geopandas, scipy), OpenStreetMap data |
+| [Optimal EV charging location (Bangalore)](https://www.github.com/Aditya9111/optimal_charging_location) | Open source, Flask/Folium | Picks parking lots for chargers, similar to our candidate-site idea |
+
+Sources not opened in full (search results only): all rows except StandortTOOL.
+
+### StandortTOOL (based on its Methodikbericht Pkw v1.0.2, `docs/Methodikbericht_Standort_TOOL_Pkw_f44bca2304.md`)
+
+- **Approach:** top-down. National charging demand from the NOW 2024 simulation study (5 scenarios) is distributed spatially.
+- **Long distance (>100 km):** traffic assignment calibrated on BASt counting stations. Demand is assigned to motorway exits and rest areas.
+- **Local (<100 km):** trip generation per house block (Zensus residents, employees, MiD travel behaviour). Output is kW and kWh per 500 m grid cell, year and scenario.
+- **Existing chargers:** subtracted from gross demand to get net demand. Each charger "radiates" into nearby cells by travel time, and fast chargers radiate further than slow ones.
+- **Stated limits:** gives no site-specific recommendation (grid connection, land and building law need local knowledge). Models demand only, no observed utilization. Traffic assignment calibration reaches 73% of count values within tolerance (target 85%).
+
+### How our project differs
+
+- **Observed utilization:** we use MobiData BW availability history (low availability = high usage). StandortTOOL models demand only.
+- **Candidate sites:** we rank concrete parking sites. StandortTOOL outputs 500 m cells.
+- **Validation:** we compare recommendations against real 2025-2026 installations. The StandortTOOL report validates only its traffic assignment.
+- **Reproducibility:** our pipeline runs on open data. StandortTOOL uses proprietary inputs (PTV Visum, infas employment data).
+- **Constraints:** the topic asks for recommendations under budget and infrastructure constraints. The StandortTOOL report describes no budget optimization.
+
+### Ideas to adopt from StandortTOOL
+
+- **Parking-space correction:** where few private parking spaces (home charging) exist, public demand is higher. StandortTOOL estimates the share of available private spaces per area type (e.g. about 40% urban vs 90% rural). Use this to adjust the demand score.
+- **Fast vs slow chargers:** weight them differently in coverage and gap metrics, since fast chargers serve a wider area.
+
 ## Project Roadmap
 
 | Phase | Status | Details |
