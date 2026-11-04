@@ -9,6 +9,8 @@ import zipfile
 import geopandas as gpd
 import pandas as pd
 
+from extract_traffic import save_traffic
+
 URL = "https://daten.gdz.bkg.bund.de/produkte/vg/vg250_ebenen_0101/2020/vg250_01-01.geo84.shape.ebenen.zip"
 ZIP_PATH = Path("data/raw/vg250.zip")
 LAYER = "vg250_01-01.geo84.shape.ebenen/vg250_ebenen_0101/VG250_KRS.shp"
@@ -450,6 +452,7 @@ def main():
     save_osm_road_points()
     save_osm_pois()
     save_osm_substations()
+    save_traffic()
 
 
 if __name__ == "__main__":
