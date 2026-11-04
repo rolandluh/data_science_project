@@ -19,7 +19,6 @@ src/
   run_pipeline.py     Empty placeholder for the full pipeline
   prepare.py, validate.py, analyze.py, evaluate.py   Empty placeholders
 requirements.txt      Python packages
-test.py               Scratch file
 ```
 
 ## Data
@@ -32,6 +31,11 @@ test.py               Scratch file
 | `bevoelkerung_1km.json` | Population per 1 km cell in BW | Zensus 2022 grid |
 | `parkplaetze_bw.geojson` | 5,882 off-street parking sites in BW | MobiData BW parking data |
 | `kreise_bw.geojson`, `laender.geojson` | District and state outlines | BKG VG250 |
+| `parkplaetze_osm_bw.geojson` | 113,728 parking sites in BW | OpenStreetMap (Overpass API) |
+| `strassen_osm_bw.geojson` | 43,831 road segments in BW: motorway, trunk, primary | OpenStreetMap (Geofabrik extract) |
+| `strassenpunkte_osm_bw.geojson` | 1,512 motorway junctions, rest areas and service areas in BW | OpenStreetMap (Geofabrik extract) |
+| `poi_osm_bw.geojson` | 40,747 POIs in BW: supermarket, retail, office, industrial, hospital, university | OpenStreetMap (Geofabrik extract) |
+| `umspannwerke_osm_bw.geojson` | 12,867 substations in BW, as a rough proxy for grid connection | OpenStreetMap (Geofabrik extract) |
 
 Raw files that are not yet used by the map: the KBA 5 km grid with the EV share (`kba_pkw_elektro_gitterzellen_2025.csv`), the KBA stock tables, and the weekly history files.
 
@@ -47,9 +51,10 @@ The history download is separate and large (about 20 GB for all weeks in 2026). 
 ## Known limits
 
 - The map is checked for syntax and served correctly; layout and speed have not been verified in every browser.
-- The Overpass API (OpenStreetMap queries) was unavailable during development, so OSM data is not used yet.
+- OSM data depends on volunteer mapping. Tags can be incomplete: only 21% of substations have a voltage, and 6,100 of the 12,867 are tagged `minor_distribution`.
 - Usage is a snapshot, not a session record: utilisation is estimated from charge-point status.
-- The historic feed covers stations across Europe; the BW subset is biased toward networks with live feeds.
+- The historic feed covers stations across Europe; the BW subset is biased toward networks with live feeds. It covers only about a third of the stations in the register and over-represents larger networks, so utilisation estimates from it may not hold for smaller operators or for regions they serve.
+- The historic data is used as it is, including the week 34 drop in rows and the week 38 anomaly (agreed with the supervisor). Utilisation features are therefore not normalised for these changes.
 - Municipality car counts are from 1 Oct 2024 and spread evenly within municipalities for any finer analysis.
 
 ## Different ideas
@@ -86,10 +91,8 @@ Ideas raised during development, not yet implemented.
 
 **Map layers**
 - 5 km EV-share layer from the KBA grid, shown beside the municipality counts.
-- OpenStreetMap supermarkets and shopping areas (waiting for Overpass).
 - On-street parking from OpenStreetMap `parking:lane` tags, which the MobiData download excludes.
 - Area-weighted aggregation of the 5 km share to municipalities, as a cross-check.
 
 **Data sources**
-- Geofabrik Baden-Württemberg extract as a local OpenStreetMap file, which avoids the Overpass outages (needs approval for pyrosm).
 - Mobilithek and daten.bw for further BW datasets.
