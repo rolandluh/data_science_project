@@ -120,8 +120,26 @@ regionInput.addEventListener("change", () => {
     }).addTo(map);
     map.fitBounds(districtLayer.getBounds());
   }
+  applyAreaVisibility();
   updateStyles();
 });
+
+// The study area (circle or district outline) can be hidden without losing the selection
+const areaInput = document.getElementById("show-area");
+
+function applyAreaVisibility() {
+  const on = areaInput.checked;
+  if (studyArea) {
+    if (on && config.region === "circle") studyArea.addTo(map);
+    else map.removeLayer(studyArea);
+  }
+  if (districtLayer) {
+    if (on) districtLayer.addTo(map);
+    else map.removeLayer(districtLayer);
+  }
+}
+
+areaInput.addEventListener("change", applyAreaVisibility);
 
 // Study area: click the map to set the center
 map.on("click", (event) => {
@@ -137,14 +155,18 @@ map.on("click", (event) => {
       fillOpacity: 0.08,
     }).addTo(map);
   }
+  applyAreaVisibility();
   updateStyles();
 });
 
 // Charging stations
 // Nearby stations merge into numbered circles that split up when zooming in
 const stationLayer = L.markerClusterGroup({ chunkedLoading: true }).addTo(map);
-const stations = []; // { record, marker, ac, dc }
+const stations = []; // { record, marker, ac, dc, historic }
 let selectedStation = null;
+// Register stations that also appear in the historic feed (within matchRadiusM)
+const matchedColor = "#9333ea";
+const matchRadiusM = 50;
 
 // Stations inside the circle are orange, the picked station is red
 function updateStyles() {
@@ -153,7 +175,8 @@ function updateStyles() {
       studyArea !== null &&
       config.region === "circle" &&
       map.distance(studyArea.getLatLng(), station.marker.getLatLng()) <= studyArea.getRadius();
-    const color = station === selectedStation ? "#16a34a" : inside ? "#f59e0b" : "#2563eb";
+    const base = station.historic ? matchedColor : "#2563eb";
+    const color = station === selectedStation ? "#16a34a" : inside ? "#f59e0b" : base;
     if (color !== station.color) {
       station.color = color;
       station.marker.setStyle({ color, fillColor: color });
@@ -166,16 +189,23 @@ function selectStation(station) {
   updateStyles();
 }
 
+const showRegisterInput = document.getElementById("show-register");
+const showMatchedInput = document.getElementById("show-matched");
+
 function showStations() {
   stationLayer.clearLayers();
   stationLayer.addLayers(
     stations
+      .filter((station) => (station.historic ? showMatchedInput.checked : showRegisterInput.checked))
       .filter((station) => config.technology === "both" || (config.technology === "ac" ? station.ac : station.dc))
       .map((station) => station.marker)
   );
 }
 
-fetch("../data/processed/ladesaeulen.json")
+showRegisterInput.addEventListener("change", showStations);
+showMatchedInput.addEventListener("change", showStations);
+
+const stationsLoaded = fetch("../data/processed/ladesaeulen.json")
   .then((response) => response.json())
   .then((data) => {
     const records = data.rows.map((row) => Object.fromEntries(data.columns.map((column, i) => [column, row[i]])));
@@ -185,17 +215,21 @@ fetch("../data/processed/ladesaeulen.json")
         weight: 1,
         fillOpacity: 0.8,
         bubblingMouseEvents: false, // a marker click must not move the study area
-      }).bindPopup(() => popupHtml(record));
+      }).bindPopup(() => {
+        const historic = marker.station.historic;
+        if (!historic) return popupHtml(record);
+        const extra = Object.fromEntries(Object.entries(historic).map(([key, value]) => [`Historic: ${key}`, value]));
+        return popupHtml({ ...record, ...extra });
+      });
       const plugs = Object.keys(record)
         .filter((key) => key.startsWith("Steckertypen"))
         .map((key) => record[key] || "")
         .join(";");
-      const station = { record, marker, ac: plugs.includes("AC "), dc: plugs.includes("DC ") };
+      const station = { record, marker, ac: plugs.includes("AC "), dc: plugs.includes("DC "), historic: null };
+      marker.station = station;
       marker.on("click", () => selectStation(station));
       stations.push(station);
     });
-    showStations();
-    updateStyles();
     console.log(`${records.length} charging stations loaded`);
   })
   .catch((error) => console.error("Could not load charging stations", error));
@@ -276,7 +310,8 @@ legend.onAdd = () => {
     ["dot", "#2563eb", "Charging station (register)"],
     ["dot", "#f59e0b", "Station in study area"],
     ["dot", "#16a34a", "Selected station"],
-    ["dot", "#e11d48", "Charging station (historic, 18 Oct 2026)"],
+    ["dot", matchedColor, "Station in register and historic data"],
+    ["dot", "#e11d48", "Charging station (historic only, 18 Oct 2026)"],
     ["dot", "#89cff0", "Parking spot (MobiData)"],
     ["dot", "#22c55e", "Parking spot (OSM)"],
     ["box", "#000000", "State border"],
@@ -297,6 +332,12 @@ legend.onAdd = () => {
   return div;
 };
 legend.addTo(map);
+
+const legendInput = document.getElementById("show-legend");
+legendInput.addEventListener("change", () => {
+  if (legendInput.checked) legend.addTo(map);
+  else legend.remove();
+});
 
 // Parking sites in Baden-Württemberg (MobiData BW), shown as baby-blue dots
 const parkingInput = document.getElementById("parking");
@@ -365,18 +406,71 @@ const historicLayer = L.geoJSON(null, {
   onEachFeature: (feature, layer) => layer.bindPopup(() => popupHtml(feature.properties)),
 }).addTo(map);
 
-fetch("../data/processed/historie_bw.geojson")
-  .then((response) => response.json())
-  .then((data) => historicLayer.addData(data))
-  .catch((error) => console.error("Could not load historic stations", error));
+const historicInput = document.getElementById("show-historic");
+historicInput.addEventListener("change", () => {
+  if (historicInput.checked) historicLayer.addTo(map);
+  else map.removeLayer(historicLayer);
+});
+
+// Matches historic stations to register stations by location (no shared ID).
+// Matched ones are drawn once, as the purple register dot; the rest stay rose.
+function matchHistoric(features) {
+  const cell = 0.001; // ~100 m grid, so only neighbouring cells need checking
+  const key = (lat, lon) => `${Math.floor(lat / cell)},${Math.floor(lon / cell)}`;
+  const grid = new Map();
+  stations.forEach((station) => {
+    const { lat, lng } = station.marker.getLatLng();
+    const k = key(lat, lng);
+    if (!grid.has(k)) grid.set(k, []);
+    grid.get(k).push(station);
+  });
+  return features.filter((feature) => {
+    const [lon, lat] = feature.geometry.coordinates;
+    const latLng = L.latLng(lat, lon);
+    let best = null;
+    let bestDistance = matchRadiusM;
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const k = `${Math.floor(lat / cell) + dy},${Math.floor(lon / cell) + dx}`;
+        (grid.get(k) || []).forEach((station) => {
+          const distance = map.distance(latLng, station.marker.getLatLng());
+          if (distance <= bestDistance) {
+            best = station;
+            bestDistance = distance;
+          }
+        });
+      }
+    }
+    if (best && !best.historic) best.historic = feature.properties;
+    return !best;
+  });
+}
+
+Promise.all([stationsLoaded, fetch("../data/processed/historie_bw.geojson").then((response) => response.json())])
+  .then(([, data]) => {
+    const unmatched = matchHistoric(data.features);
+    historicLayer.addData({ type: "FeatureCollection", features: unmatched });
+    console.log(`${data.features.length - unmatched.length} historic stations matched to the register`);
+  })
+  .catch((error) => console.error("Could not load historic stations", error))
+  .finally(() => {
+    showStations();
+    updateStyles();
+  });
 
 // Black outlines of the German states (no fill, so they don't block clicks)
+const bordersLayer = L.geoJSON(null, {
+  interactive: false,
+  style: { color: "#000000", weight: 1.5, fill: false },
+}).addTo(map);
+
 fetch("../data/processed/laender.geojson")
   .then((response) => response.json())
-  .then((data) => {
-    L.geoJSON(data, {
-      interactive: false,
-      style: { color: "#000000", weight: 1.5, fill: false },
-    }).addTo(map);
-  })
+  .then((data) => bordersLayer.addData(data))
   .catch((error) => console.error("Could not load state borders", error));
+
+const bordersInput = document.getElementById("show-borders");
+bordersInput.addEventListener("change", () => {
+  if (bordersInput.checked) bordersLayer.addTo(map);
+  else map.removeLayer(bordersLayer);
+});
