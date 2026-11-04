@@ -47,6 +47,10 @@ Offices are half of all POIs, so weight the categories instead of using a plain 
 |---|---|
 | `strassen_osm_bw.geojson` (43,831 segments) | Distance to the nearest major road, road length per cell, road class, lanes, speed limit |
 | `strassenpunkte_osm_bw.geojson` (1,512 points) | Distance to motorway junctions, rest areas and services |
+| `verkehr_zaehlstellen_bw.geojson` (202 stations) | Average daily traffic per year, by station and road |
+| `verkehr_monatlich.json` (10,639 rows) | Monthly traffic, weekday vs Sunday, heavy vehicles |
+
+Traffic counts exist only at the stations, so traffic between them has to be estimated. See `docs/data_mobidata_bw_traffic.md`.
 
 ## Candidate sites
 
@@ -74,5 +78,4 @@ This is a rough proxy for grid connection. It shows where substations are, not t
 ## Still missing
 
 - **Costs:** charger and grid connection costs, needed for the budget constraint.
-- **Traffic volumes:** roads show where traffic can flow, not how much there is.
 - **Home-charging proxy:** no direct data yet for the parking-space correction. Zensus building data has not been checked.
