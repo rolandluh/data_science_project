@@ -61,5 +61,5 @@ Zensus 2022 Grid ──────────── population density (demand
 1. **Historic data drop (W34):** Platform archiving change on 17 Aug 2026 reduced weekly rows by ~90%. Not a data loss — switch to change-only deltas. See `comparison_report_historic_mobidata.md`.
 2. **Vehicle data lag:** KBA data is from Oct 2024, ~2 years behind the charging data. EV adoption has likely grown since.
 3. **Boundary edition:** VG250 is from 2020. Some municipal mergers since then may cause join mismatches.
-4. **Historic coverage bias:** The MobiData BW feed covers stations with live feeds, biased toward larger networks. Smaller operators may be underrepresented.
+4. **Historic coverage bias:** The MobiData BW feed covers stations with live feeds, biased toward larger networks. It covers only about a third of the stations in the register, so smaller operators are underrepresented. Treat this as a limitation of any utilisation result.
 5. **Parking completeness:** Street parking data (ON_STREET) is from specific municipal surveys (e.g. Ladenburg), not a comprehensive survey of all BW streets.

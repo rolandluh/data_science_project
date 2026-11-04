@@ -1,4 +1,5 @@
 """Data acquisition: download BKG district boundaries and Bundesnetzagentur charging stations, save Baden-Württemberg subsets."""
+from functools import lru_cache
 from pathlib import Path
 import json
 import urllib.error
@@ -286,6 +287,136 @@ def save_osm_parking():
     print(f"{len(features)} OSM parking features saved to {OSM_PARK_OUT}")
 
 
+OSM_PBF_URL = "https://download.geofabrik.de/europe/germany/baden-wuerttemberg-latest.osm.pbf"
+OSM_PBF_PATH = Path("data/raw/baden-wuerttemberg-latest.osm.pbf")
+OSM_ROADS_OUT = Path("data/processed/strassen_osm_bw.geojson")
+OSM_ROAD_POINTS_OUT = Path("data/processed/strassenpunkte_osm_bw.geojson")
+OSM_POIS_OUT = Path("data/processed/poi_osm_bw.geojson")
+OSM_SUBSTATIONS_OUT = Path("data/processed/umspannwerke_osm_bw.geojson")
+OSM_KEYS = ("highway", "power", "shop", "office", "amenity", "landuse")
+OSM_ROAD_TYPES = {"motorway", "trunk", "primary"}
+OSM_RETAIL_SHOPS = {"mall", "department_store", "doityourself", "furniture", "electronics", "garden_centre"}
+
+
+def _osm_poi_category(tags):
+    """Return the POI category of an OSM object, or None if it is not a POI we use."""
+    shop = tags.get("shop")
+    if shop == "supermarket":
+        return "supermarket"
+    if shop in OSM_RETAIL_SHOPS:
+        return "retail"
+    if "office" in tags and tags.get("office") != "no":
+        return "office"
+    if tags.get("landuse") in ("industrial", "commercial"):
+        return "industrial"
+    amenity = tags.get("amenity")
+    if amenity == "hospital":
+        return "hospital"
+    if amenity in ("university", "college"):
+        return "university"
+    return None
+
+
+def _classify_osm_point(tags):
+    """Return (layer, properties) for an OSM node or area, or None if it is not needed."""
+    highway = tags.get("highway")
+    if highway == "motorway_junction":
+        return "road_points", {"kind": "junction", "name": tags.get("name"), "ref": tags.get("ref")}
+    if highway in ("rest_area", "services"):
+        return "road_points", {"kind": highway, "name": tags.get("name"), "ref": tags.get("ref")}
+    if tags.get("power") == "substation":
+        return "substations", {
+            "name": tags.get("name"), "operator": tags.get("operator"),
+            "voltage": tags.get("voltage"), "substation": tags.get("substation"),
+        }
+    category = _osm_poi_category(tags)
+    if category:
+        return "pois", {"category": category, "name": tags.get("name")}
+    return None
+
+
+@lru_cache(maxsize=1)
+def _read_osm():
+    """Read roads, road points, POIs and substations from the PBF in one pass (several minutes)."""
+    import osmium
+    import shapely
+
+    if not OSM_PBF_PATH.exists():
+        urllib.request.urlretrieve(OSM_PBF_URL, OSM_PBF_PATH)
+
+    layers = {"roads": [], "road_points": [], "pois": [], "substations": []}
+    wkb = osmium.geom.WKBFactory()
+    broken_areas = 0
+    # Tag filtering runs in C++, so Python only sees the objects that can match
+    objects = (
+        osmium.FileProcessor(str(OSM_PBF_PATH))
+        .with_locations()
+        .with_areas()
+        .with_filter(osmium.filter.KeyFilter(*OSM_KEYS))
+    )
+    for obj in objects:
+        if obj.is_way():
+            highway = obj.tags.get("highway")
+            if highway in OSM_ROAD_TYPES:
+                coords = [(node.lon, node.lat) for node in obj.nodes if node.location.valid()]
+                if len(coords) >= 2:
+                    layers["roads"].append((shapely.LineString(coords), {
+                        "osm_id": obj.id, "highway": highway, "ref": obj.tags.get("ref"),
+                        "name": obj.tags.get("name"), "maxspeed": obj.tags.get("maxspeed"),
+                        "lanes": obj.tags.get("lanes"),
+                    }))
+        elif obj.is_node():
+            match = _classify_osm_point(obj.tags)
+            if match and obj.location.valid():
+                layer, properties = match
+                layers[layer].append((shapely.Point(obj.lon, obj.lat), {"osm_id": obj.id, "osm_type": "node", **properties}))
+        elif obj.is_area():
+            match = _classify_osm_point(obj.tags)
+            if match:
+                try:
+                    shape = shapely.from_wkb(wkb.create_multipolygon(obj))
+                except RuntimeError:
+                    broken_areas += 1
+                    continue
+                layer, properties = match
+                # Areas become their centre point, so nodes and areas share one geometry type
+                osm_type = "way" if obj.from_way() else "relation"
+                layers[layer].append((shape.centroid, {"osm_id": obj.orig_id(), "osm_type": osm_type, **properties}))
+    if broken_areas:
+        print(f"  {broken_areas} OSM areas skipped: invalid geometry")
+    return layers
+
+
+def _save_osm_layer(layer, out_path, predicate="within"):
+    if out_path.exists():
+        print(f"{out_path} already exists, skipping")
+        return
+    rows = _read_osm()[layer]
+    features = gpd.GeoDataFrame([row[1] for row in rows], geometry=[row[0] for row in rows], crs="EPSG:4326")
+    # The Geofabrik extract reaches slightly beyond the state border
+    states = gpd.read_file(STATES_OUT)
+    features = gpd.sjoin(features, states[states["AGS"] == "08"][["geometry"]], predicate=predicate)
+    features.drop(columns="index_right").to_file(out_path, driver="GeoJSON")
+    print(f"{len(features)} OSM {layer} features saved to {out_path}")
+
+
+def save_osm_roads():
+    # Roads crossing the border stay whole
+    _save_osm_layer("roads", OSM_ROADS_OUT, predicate="intersects")
+
+
+def save_osm_road_points():
+    _save_osm_layer("road_points", OSM_ROAD_POINTS_OUT)
+
+
+def save_osm_pois():
+    _save_osm_layer("pois", OSM_POIS_OUT)
+
+
+def save_osm_substations():
+    _save_osm_layer("substations", OSM_SUBSTATIONS_OUT)
+
+
 HIST_WEEK_URL = "https://mobidata-bw.de/daten/historisierung/woche/{year}/{week}_89fb3a0b-cc42-48a6-b17a-8f1b46abccf1.csv.gz"
 
 
@@ -315,6 +446,10 @@ def main():
     save_parking()
     save_historic_stations()
     save_osm_parking()
+    save_osm_roads()
+    save_osm_road_points()
+    save_osm_pois()
+    save_osm_substations()
 
 
 if __name__ == "__main__":

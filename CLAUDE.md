@@ -32,15 +32,21 @@ Each `save_*()` function skips if its output file already exists. Delete the out
 | `save_population()` | `bevoelkerung_1km.json` | Zensus 2022 |
 | `save_ev_municipalities()` | `gemeinden_ev.geojson` | KBA FZ3 + FZ27 |
 | `save_parking()` | `parkplaetze_bw.geojson` | MobiData BW (off-street + street) |
+| `save_osm_parking()` | `parkplaetze_osm_bw.geojson` | OpenStreetMap (Overpass API, `amenity=parking`) |
+| `save_osm_roads()` | `strassen_osm_bw.geojson` | OpenStreetMap (Geofabrik PBF): motorway, trunk, primary |
+| `save_osm_road_points()` | `strassenpunkte_osm_bw.geojson` | OpenStreetMap (Geofabrik PBF): junctions, rest areas, services |
+| `save_osm_pois()` | `poi_osm_bw.geojson` | OpenStreetMap (Geofabrik PBF): supermarket, retail, office, industrial, hospital, university |
+| `save_osm_substations()` | `umspannwerke_osm_bw.geojson` | OpenStreetMap (Geofabrik PBF): `power=substation` |
 | `save_historic_stations()` | `historie_bw.geojson` | MobiData BW history snapshot |
 
 ## Historic data notes
 
 - Weekly parquet files in `data/processed/historie_parquet/` (weeks 202605–202640, ~44 GB total)
 - Raw gzip CSVs in `data/raw/historie/` (~33 GB)
-- **Data drop at week 34 (17 Aug 2026):** Platform-side archiving change — polling interval doubled, snapshots switched to change-only deltas. Not a data loss. See `docs/comparison_report_historic_mobidata.md`
-- Week 38 is an anomaly (102k stations, 1404 min gap)
-- All columns stored as strings in parquet — casting numerics would improve compression
+- **Data drop at week 34 (17 Aug 2026):** Platform-side archiving change — polling interval doubled, snapshots switched to change-only deltas. Not a data loss. See `docs/comparison_report_historic_mobidata.md`. Decision (supervisor): use the data as it is, no special handling.
+- Week 38 is an anomaly (102k stations, 1404 min gap); also used as it is
+- All columns stored as strings in parquet — casting numerics would improve compression; deliberately left as is for now
+- Coverage bias: the feed covers only about a third of stations and favours larger networks. Documented as a limitation in `README.md` and `docs/data_sources_summary.md`
 
 ## Git
 
