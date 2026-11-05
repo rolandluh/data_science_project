@@ -314,6 +314,7 @@ legend.onAdd = () => {
     ["dot", "#e11d48", "Charging station (historic only, 18 Oct 2026)"],
     ["dot", "#89cff0", "Parking spot (MobiData)"],
     ["dot", "#22c55e", "Parking spot (OSM)"],
+    ["dot", "#0d9488", "Traffic counting site"],
     ["box", "#000000", "State border"],
     ["box", "#2563eb", "Study area / district"],
     ["gradient", "linear-gradient(to right, rgba(37,99,235,0.6), rgba(245,158,11,0.6), rgba(220,38,38,0.8))", "Population heatmap (zoom 9+)"],
@@ -390,6 +391,76 @@ fetch("../data/processed/parkplaetze_osm_bw.geojson")
 parkingOsmInput.addEventListener("change", () => {
   if (parkingOsmInput.checked) parkingOsmLayer.addTo(map);
   else map.removeLayer(parkingOsmLayer);
+});
+
+// Traffic counting sites (Verkehrsmonitoring BW) as teal dots
+const trafficCounterColor = "#0d9488";
+const countTypes = {
+  DZ: "Permanent station",
+  DZZ: "Permanently counting site",
+  MZ: "Manual count",
+  "MZ*": "Manual count this year, reduced values",
+  TM: "Temporary measurement",
+  "TM 2G": "Temporary measurement, 2 devices",
+  VBA: "Traffic control system",
+};
+const countLocations = { FS: "Open road", OD: "Through town" };
+const countMethods = { H: "Extrapolated from a count", F: "Carried forward from an earlier count" };
+
+function vehiclesPerDay(value) {
+  return value == null ? null : `${Math.round(value).toLocaleString("en-US")} / day`;
+}
+
+// Labels and units for a counting site; empty values are dropped by popupHtml
+function trafficCounterPopup(p) {
+  const share = (part) => (part != null && p.dtv ? ` (${((100 * part) / p.dtv).toFixed(1)} %)` : "");
+  const change =
+    p.dtv != null && p.dtv_two_years_before != null
+      ? `${(100 * (p.dtv / p.dtv_two_years_before - 1)).toFixed(1)} %`
+      : null;
+  const section = [p.direction_1, p.direction_2].filter(Boolean).join(" – ");
+  return popupHtml({
+    Road: p.road,
+    Section: section,
+    "Site number": p.station_id,
+    Type: countTypes[p.count_type] || p.count_type,
+    Location: countLocations[p.location] || p.location,
+    Lanes: p.lanes,
+    [`Traffic ${p.year} (all vehicles)`]: vehiclesPerDay(p.dtv) ?? "no data",
+    "Cars and vans": p.dtv_cars == null ? null : vehiclesPerDay(p.dtv_cars) + share(p.dtv_cars),
+    "Heavy vehicles": p.dtv_heavy == null ? null : vehiclesPerDay(p.dtv_heavy) + share(p.dtv_heavy),
+    "Normal workdays": vehiclesPerDay(p.dtv_workday),
+    "Workdays in school holidays": vehiclesPerDay(p.dtv_holiday_workday),
+    "Sundays and public holidays": vehiclesPerDay(p.dtv_sunday),
+    [`Change since ${p.year - 2}`]: change,
+    "Last counted": p.last_counted,
+    [`How ${p.year} was calculated`]: countMethods[p.method] || null,
+    Comment: p.comment,
+  });
+}
+
+const trafficCounterInput = document.getElementById("traffic-counters");
+const trafficCounterLayer = L.geoJSON(null, {
+  pointToLayer: (feature, latlng) =>
+    L.circleMarker(latlng, {
+      radius: 3,
+      color: trafficCounterColor,
+      fillColor: trafficCounterColor,
+      fillOpacity: 0.9,
+      weight: 1,
+      bubblingMouseEvents: false,
+    }),
+  onEachFeature: (feature, layer) => layer.bindPopup(() => trafficCounterPopup(feature.properties)),
+});
+
+fetch("../data/processed/verkehr_svz_bw.geojson")
+  .then((response) => response.json())
+  .then((data) => trafficCounterLayer.addData(data))
+  .catch((error) => console.warn("Traffic counting sites not loaded (file may not exist yet)", error));
+
+trafficCounterInput.addEventListener("change", () => {
+  if (trafficCounterInput.checked) trafficCounterLayer.addTo(map);
+  else map.removeLayer(trafficCounterLayer);
 });
 
 // Stations from the historic feed in Baden-Württemberg (18 Oct 2026) as rose dots

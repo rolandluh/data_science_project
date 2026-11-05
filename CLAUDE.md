@@ -38,7 +38,7 @@ Each `save_*()` function skips if its output file already exists. Delete the out
 | `save_osm_pois()` | `poi_osm_bw.geojson` | OpenStreetMap (Geofabrik PBF): supermarket, retail, office, industrial, hospital, university |
 | `save_osm_substations()` | `umspannwerke_osm_bw.geojson` | OpenStreetMap (Geofabrik PBF): `power=substation` |
 | `save_historic_stations()` | `historie_bw.geojson` | MobiData BW history snapshot |
-| `save_traffic()` (`src/extract_traffic.py`) | `verkehr_monatlich.json`, `verkehr_zaehlstellen_bw.geojson` | MobiData BW Dauerzählstellen + SVZ station list |
+| `save_traffic_counters()` (`src/extract_traffic.py`) | `verkehr_svz_bw.geojson` | Verkehrsmonitoring BW 2024 (`Test_Ergebnisse_2024_Excel.zip`, added by hand) + SVZ station list |
 
 ## Historic data notes
 
