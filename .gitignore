@@ -5,6 +5,10 @@ __pycache__/
 venv/
 .env
 
+# Tooling
+.agents/
+.playwright-mcp/
+
 
 # Data
 docs/DS500_Data_Science_Project_Winter_Term_2026_2027.pdf
