@@ -47,10 +47,9 @@ Offices are half of all POIs, so weight the categories instead of using a plain 
 |---|---|
 | `strassen_osm_bw.geojson` (43,831 segments) | Distance to the nearest major road, road length per cell, road class, lanes, speed limit |
 | `strassenpunkte_osm_bw.geojson` (1,512 points) | Distance to motorway junctions, rest areas and services |
-| `verkehr_zaehlstellen_bw.geojson` (202 stations) | Average daily traffic per year, by station and road |
-| `verkehr_monatlich.json` (10,639 rows) | Monthly traffic, weekday vs Sunday, heavy vehicles |
+| `verkehr_svz_bw.geojson` (5,638 sites) | Traffic in 2024 on motorways, federal, state and county roads: all vehicles, cars and vans, heavy vehicles, day types |
 
-Traffic counts exist only at the stations, so traffic between them has to be estimated. See `docs/data_mobidata_bw_traffic.md`.
+Traffic counts exist only at the counting sites, so traffic between them has to be estimated. See `docs/data_mobidata_bw_traffic.md`.
 
 ## Candidate sites
 

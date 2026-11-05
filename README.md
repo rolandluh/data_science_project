@@ -16,7 +16,7 @@ data/
 docs/                 Project outline
 src/
   extract.py          Download and prepare all data
-  extract_traffic.py  Download and prepare traffic volumes
+  extract_traffic.py  Prepare traffic volumes
   run_pipeline.py     Empty placeholder for the full pipeline
   prepare.py, validate.py, analyze.py, evaluate.py   Empty placeholders
 requirements.txt      Python packages
@@ -37,8 +37,7 @@ requirements.txt      Python packages
 | `strassenpunkte_osm_bw.geojson` | 1,512 motorway junctions, rest areas and service areas in BW | OpenStreetMap (Geofabrik extract) |
 | `poi_osm_bw.geojson` | 40,747 POIs in BW: supermarket, retail, office, industrial, hospital, university | OpenStreetMap (Geofabrik extract) |
 | `umspannwerke_osm_bw.geojson` | 12,867 substations in BW, as a rough proxy for grid connection | OpenStreetMap (Geofabrik extract) |
-| `verkehr_monatlich.json` | Monthly average daily traffic per counting station, Jan 2022 to Aug 2026 | MobiData BW Dauerzählstellen |
-| `verkehr_zaehlstellen_bw.geojson` | 202 counting stations with yearly traffic, 185 with a position | MobiData BW Dauerzählstellen and SVZ station list |
+| `verkehr_svz_bw.geojson` | 5,638 counting sites with 2024 traffic, shown on the map | Verkehrsmonitoring BW 2024 and SVZ station list |
 
 Raw files that are not yet used by the map: the KBA 5 km grid with the EV share (`kba_pkw_elektro_gitterzellen_2025.csv`), the KBA stock tables, and the weekly history files.
 
