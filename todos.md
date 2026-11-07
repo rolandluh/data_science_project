@@ -2,7 +2,7 @@ Compared with the outline, the pipeline already covers supply, population, EV co
 
 **Needed for the planned methods**
 - **Roads and traffic:** the topic names road networks. The two options are the OSM road network via Overpass, which you already use for parking, or BKG DLM. For traffic volumes, the BW DTV counts from the Statistisches Landesamt BW (the StandortTOOL report cites them) or BASt counting stations. Traffic is the most useful proxy for en-route charging demand.
-- **Newer or finer EV data:** the KBA municipality data is from Oct 2024. The 5 km EV-share grid is documented but not integrated yet. Integrate it, and look for a newer KBA edition.
+- ~~**Newer or finer EV data:**~~ done: the KBA 5 km EV-share grid replaced the Oct 2024 municipality data and is distributed to 500 m cells by population.
 - **Home charging proxy:** StandortTOOL corrects demand for missing private parking. The Zensus 2022 grid data may have building-type or ownership indicators (e.g. share of single-family homes). I haven't checked this. Check what Destatis offers at grid level.
 
 **Needed for better demand modelling**
@@ -29,18 +29,20 @@ My priority is roads/traffic, the 5 km EV grid and OSM POIs. The others can wait
 - Commit `docs/project_outline.md` (related work) and `todos.md`.
 
 **Data**
-- Integrate the KBA 5 km EV grid.
+- ~~Integrate the KBA 5 km EV grid.~~ Done (5 km layer and 500 m EV index).
+- ~~Add income data.~~ Done: BA median wage per 500 m cell (1 km → 5 km → district fallback).
 - Add roads/traffic and OSM POIs (see the data section above).
 - Update the VG250 boundaries, which are from 2020. Municipal mergers may break joins.
 - Add a pipeline step that checks outputs and reports implausible values. The course requires automated validation.
 
 **Historic data**
-- Decide how to handle the W34 drop and the W38 anomaly in the utilization features: use only W26–W33, or normalize.
+- ~~Decide how to handle the W34 drop and the W38 anomaly.~~ Done: occupancy is time-weighted per station (`src/extract_occupancy.py`), so the switch to deltas (14 Aug 2026, 17:04) needs no normalisation; the W38 anomaly is static `bnetza_api` rows, which are dropped.
+- Check why only about half the station-days are valid in weeks 25–26 and 29–31.
 - Cast numeric parquet columns to reduce the ~44 GB.
-- Document the coverage bias (about ⅓ of stations, larger networks) as a limitation.
+- ~~Document the coverage bias (about ⅓ of stations, larger networks) as a limitation.~~ Done (README, `data_sources_summary.md`).
 
 **Model (the main gap, nothing exists yet)**
-- Fixed grid and feature table: demand score, coverage gap, utilization.
+- Fixed grid and feature table: demand score, coverage gap, utilization. The 500 m grid with population, EV index and income exists; daily occupancy per station exists.
 - Weighted scoring model with the parking-space correction and fast/slow weights.
 - DBSCAN and Moran's I as planned.
 - Budget-constrained selection (greedy or MIP), since the topic asks for it.

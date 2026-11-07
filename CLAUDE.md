@@ -49,8 +49,8 @@ Each `save_*()` function skips if its output file already exists. Delete the out
 - Weekly parquet files in `data/processed/historie_parquet/` (weeks 202605–202640, ~44 GB total)
 - Raw gzip CSVs in `data/raw/historie/` (~33 GB)
 - **Switch to change-only deltas: 14 Aug 2026, 17:04** (first snapshot with ~4k instead of ~37k rows; detected in `extract_occupancy.py`). Averages must be time-weighted (status holds until the next row), not row means.
-- **Data drop at week 34 (17 Aug 2026):** Platform-side archiving change — polling interval doubled, snapshots switched to change-only deltas. Not a data loss. See `docs/comparison_report_historic_mobidata.md`. Decision (supervisor): use the data as it is, no special handling.
-- Week 38 is an anomaly (102k stations, 1404 min gap); also used as it is
+- **Data drop (first dated week 34, 17 Aug 2026):** Platform-side archiving change — polling interval doubled, snapshots switched to change-only deltas. Not a data loss. See `docs/comparison_report_historic_mobidata.md`. Decision (supervisor): use the data as it is, no special handling.
+- Week 38 is an anomaly (102k stations, 1404 min gap); also used as it is. The 102k rows are static `bnetza_api` register dumps (also once in week 05), dropped for occupancy
 - All columns stored as strings in parquet — casting numerics would improve compression; deliberately left as is for now
 - Coverage bias: the feed covers only about a third of stations and favours larger networks. Documented as a limitation in `README.md` and `docs/data_sources_summary.md`
 

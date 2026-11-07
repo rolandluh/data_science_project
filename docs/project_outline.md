@@ -123,9 +123,9 @@ Sources not opened in full (search results only): all rows except StandortTOOL.
 
 | Phase | Status | Details |
 |-------|--------|---------|
-| Data collection | Done | 6 sources, automated pipeline (`extract.py`), 33 GB raw → 44 MB processed |
+| Data collection | Done | Register, MobiData BW (history, parking), KBA EV grid, Zensus, BA income, BKG, OSM, traffic counts; automated pipeline (`extract.py`) |
 | Data quality / EDA | Done | Completeness matrix, outlier detection, cross-dataset consistency, spatial sanity checks |
-| Feature engineering | Next | Demand score per grid cell, coverage gap metrics, utilization features from historic data |
+| Feature engineering | In progress | Done: 500 m grid with population, EV index and income; daily occupancy per station (`extract_occupancy.py`). Next: demand score, coverage gap metrics |
 | Model / scoring | Next | Weighted placement model, clustering, spatial autocorrelation analysis |
 | Map visualization | In progress | Leaflet map with data layers live; needs model output / recommendation layer |
 | Validation | Planned | Compare recommendations against recent 2025–2026 installations as ground truth |
