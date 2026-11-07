@@ -35,6 +35,7 @@ Each `save_*()` function skips if its output file already exists. Delete the out
 | `save_income_population_grid()` | `einkommen_500m_bw.json` | BA median wage (1 km → 5 km → district fallback) + employees split by residents (`Grunddaten-regionale-Entgelte.zip` and `entgelt_kreise_wohnort_202512.xlsx`, added by hand) |
 | `save_parking()` | `parkplaetze_bw.geojson` | MobiData BW (off-street + street) |
 | `save_osm_parking()` | `parkplaetze_osm_bw.geojson` | OpenStreetMap (Overpass API, `amenity=parking`) |
+| `save_combined_parking()` | `parkplaetze_kombiniert_bw.geojson` | OSM parking as base, MobiData attributes joined via `sjoin_nearest` within 10 m, unmatched MobiData sites appended (`source` = `osm`, `mobidata`, `osm+mobidata`) |
 | `save_osm_roads()` | `strassen_osm_bw.geojson` | OpenStreetMap (Geofabrik PBF): motorway, trunk, primary |
 | `save_osm_road_points()` | `strassenpunkte_osm_bw.geojson` | OpenStreetMap (Geofabrik PBF): junctions, rest areas, services |
 | `save_osm_pois()` | `poi_osm_bw.geojson` | OpenStreetMap (Geofabrik PBF): supermarket, retail, office, industrial, hospital, university |

@@ -59,4 +59,4 @@ Small reference file with 4 example records and field mappings between German so
 
 ## Usage in project
 
-Parking layer on the map. Relevant for placement optimization: proximity to existing parking infrastructure indicates accessible locations for new charging stations.
+The map shows one parking layer built from this file and the OSM parking file (`save_combined_parking()`, output `parkplaetze_kombiniert_bw.geojson`). OSM is the base; the nearest MobiData site within 10 m is joined onto it (2,339 matches) and the other 26,136 MobiData sites are appended. For matched sites `name`, `operator_name` and `capacity` take the MobiData value first. Relevant for placement optimization: proximity to existing parking infrastructure indicates accessible locations for new charging stations.
