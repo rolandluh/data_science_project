@@ -234,7 +234,7 @@ const stationsLoaded = fetch("../data/processed/ladesaeulen.json")
   })
   .catch((error) => console.error("Could not load charging stations", error));
 
-// Population heatmap from Zensus 2022 (1 km cells): [lat, lon, residents]
+// Population heatmap from Zensus 2022 (100 m cells summed to 500 m): [lat, lon, residents]
 // Semi-transparent colours; the heatmap is only shown between these zoom levels
 const populationHeat = L.heatLayer([], {
   radius: 12,
@@ -251,7 +251,7 @@ function updatePopulationHeat() {
   else map.removeLayer(populationHeat);
 }
 
-fetch("../data/processed/bevoelkerung_1km.json")
+fetch("../data/processed/bevoelkerung_500m.json")
   .then((response) => response.json())
   .then((rows) => populationHeat.setLatLngs(rows))
   .catch((error) => console.error("Could not load population", error));
@@ -259,14 +259,14 @@ fetch("../data/processed/bevoelkerung_1km.json")
 populationInput.addEventListener("change", updatePopulationHeat);
 map.on("zoomend", updatePopulationHeat);
 
-// Municipality choropleth of battery-electric cars (KBA, 1 Oct 2024)
-const evBreaks = [50, 100, 250, 500, 1000, 2500, 5000];
+// 5 km grid choropleth: share of cars with electric drive in % (KBA)
+const evBreaks = [3, 4, 5, 6, 7, 8, 10];
 const evColors = ["#fef9c3", "#fde68a", "#fcd34d", "#fbbf24", "#f59e0b", "#d97706", "#b45309", "#7c2d12"];
 const evInput = document.getElementById("ev");
 
-function evColor(bev) {
+function evColor(share) {
   let i = 0;
-  while (i < evBreaks.length && bev >= evBreaks[i]) i++;
+  while (i < evBreaks.length && share >= evBreaks[i]) i++;
   return evColors[i];
 }
 
@@ -274,71 +274,177 @@ const evLayer = L.geoJSON(null, {
   style: (feature) => ({
     color: "#6b7280",
     weight: 0.3,
-    fillColor: feature.properties.bev == null ? "#e5e7eb" : evColor(feature.properties.bev),
-    fillOpacity: 0.7,
+    fillColor: feature.properties.ev_share == null ? "#e5e7eb" : evColor(feature.properties.ev_share),
+    fillOpacity: 0.6,
   }),
   onEachFeature: (feature, layer) => {
     const p = feature.properties;
-    const share = p.pkw ? ((100 * p.bev) / p.pkw).toFixed(1) + " %" : "no data";
     layer.bindPopup(
       popupHtml({
-        Gemeinde: p.GEN,
-        "Cars (all)": p.pkw,
-        "Battery-electric (BEV)": p.bev,
-        "Plug-in hybrid": p.phev,
-        "BEV share": share,
+        "5 km cell": p.cell_id,
+        "EV share (cars)": p.ev_share == null ? "no data" : p.ev_share + " %",
+        "Reporting year": p.year,
       })
     );
   },
 });
 
-fetch("../data/processed/gemeinden_ev.geojson")
+fetch("../data/processed/ev_anteil_5km_bw.geojson")
   .then((response) => response.json())
   .then((data) => evLayer.addData(data))
-  .catch((error) => console.error("Could not load municipalities", error));
+  .catch((error) => console.error("Could not load EV grid", error));
 
 evInput.addEventListener("change", () => {
   if (evInput.checked) evLayer.addTo(map);
   else map.removeLayer(evLayer);
 });
 
-// Legend for all symbols and colours, bottom-left
-const legend = L.control({ position: "bottomleft" });
-legend.onAdd = () => {
-  const div = L.DomUtil.create("div", "legend");
-  const symbols = [
-    ["dot", "#2563eb", "Charging station (register)"],
-    ["dot", "#f59e0b", "Station in study area"],
-    ["dot", "#16a34a", "Selected station"],
-    ["dot", matchedColor, "Station in register and historic data"],
-    ["dot", "#e11d48", "Charging station (historic only, 18 Oct 2026)"],
-    ["dot", "#89cff0", "Parking spot (MobiData)"],
-    ["dot", "#22c55e", "Parking spot (OSM)"],
-    ["dot", "#0d9488", "Traffic counting site"],
-    ["box", "#000000", "State border"],
-    ["box", "#2563eb", "Study area / district"],
-    ["gradient", "linear-gradient(to right, rgba(37,99,235,0.6), rgba(245,158,11,0.6), rgba(220,38,38,0.8))", "Population heatmap (zoom 9+)"],
-  ];
-  const labels = [
-    `&lt; ${evBreaks[0]}`,
-    ...evBreaks.slice(0, -1).map((b, i) => `${b} – ${evBreaks[i + 1]}`),
-    `≥ ${evBreaks[evBreaks.length - 1]}`,
-  ];
-  div.innerHTML =
-    "<strong>Symbols</strong>" +
-    symbols.map(([shape, color, label]) => `<div><span class="swatch ${shape}" style="background:${color}"></span>${label}</div>`).join("") +
-    "<strong>BEV cars per municipality</strong>" +
-    labels.map((label, i) => `<div><span class="swatch" style="background:${evColors[i]}"></span>${label}</div>`).join("") +
-    '<div><span class="swatch" style="background:#e5e7eb"></span>no data</div>';
-  return div;
-};
-legend.addTo(map);
+// Colour class of a value: breaks [b0, b1, ...] give classes < b0, b0 – b1, ..., ≥ last
+function classColor(value, breaks, colors) {
+  let i = 0;
+  while (i < breaks.length && value >= breaks[i]) i++;
+  return colors[i];
+}
 
-const legendInput = document.getElementById("show-legend");
-legendInput.addEventListener("change", () => {
-  if (legendInput.checked) legend.addTo(map);
-  else legend.remove();
-});
+function classLabels(breaks, format = (b) => b) {
+  return [
+    `&lt; ${format(breaks[0])}`,
+    ...breaks.slice(0, -1).map((b, i) => `${format(b)} – ${format(breaks[i + 1])}`),
+    `≥ ${format(breaks[breaks.length - 1])}`,
+  ];
+}
+
+// 500 m grid layer from a {columns, rows} JSON file; data is loaded the first time the switch is turned on
+function gridLayer(input, url, styleRow, popupRow) {
+  const layer = L.layerGroup();
+  let loaded = null;
+  input.addEventListener("change", () => {
+    if (!input.checked) {
+      map.removeLayer(layer);
+      return;
+    }
+    loaded =
+      loaded ||
+      fetch(url)
+        .then((response) => response.json())
+        .then(({ columns, rows }) => {
+          const col = Object.fromEntries(columns.map((name, i) => [name, i]));
+          const get = (row) => Object.fromEntries(Object.entries(col).map(([name, i]) => [name, row[i]]));
+          rows.forEach((row) => {
+            const cell = get(row);
+            // Approximate the 500 m EPSG:3035 cell as a lat/lon square around its centre (display only)
+            const dLat = 0.00225;
+            const dLon = 0.00225 / Math.cos((cell.lat * Math.PI) / 180);
+            L.rectangle(
+              [
+                [cell.lat - dLat, cell.lon - dLon],
+                [cell.lat + dLat, cell.lon + dLon],
+              ],
+              { stroke: false, fillOpacity: 0.7, ...styleRow(cell) }
+            )
+              .bindPopup(() => popupHtml(popupRow(cell)))
+              .addTo(layer);
+          });
+        })
+        .catch((error) => console.error(`Could not load ${url}`, error));
+    loaded.then(() => {
+      if (input.checked) layer.addTo(map);
+    });
+  });
+  return layer;
+}
+
+const noDataColor = "#e5e7eb";
+
+// 500 m cells: parent 5 km EV share weighted by Zensus residents (ev_index = residents x share / 100)
+const evPopBreaks = [1, 2.5, 5, 10, 25, 50, 100];
+const evPopColors = ["#f0fdfa", "#ccfbf1", "#99f6e4", "#5eead4", "#2dd4bf", "#14b8a6", "#0f766e", "#134e4a"];
+const evPopInput = document.getElementById("ev-500m");
+gridLayer(
+  evPopInput,
+  "../data/processed/ev_bevoelkerung_500m_bw.json",
+  (c) => ({ fillColor: c.ev_index == null ? noDataColor : classColor(c.ev_index, evPopBreaks, evPopColors) }),
+  (c) => ({
+    "Residents (500 m)": c.Einwohner,
+    "EV share of parent 5 km cell": c.ev_share == null ? "no data" : c.ev_share + " %",
+    "EV index (residents × share)": c.ev_index == null ? "no data" : c.ev_index,
+    "5 km cell": c.cell_5km,
+  })
+);
+
+// 500 m cells: median monthly gross wage at residence (BA), from the 1 km parent or the 5 km parent
+const incomeBreaks = [3800, 4100, 4300, 4500, 4700, 5000, 5500];
+const incomeColors = ["#faf5ff", "#f3e8ff", "#e9d5ff", "#d8b4fe", "#c084fc", "#a855f7", "#7e22ce", "#4c1d95"];
+const incomeInput = document.getElementById("income-500m");
+const euro = (value) => `${Math.round(value).toLocaleString("de-DE")} €`;
+gridLayer(
+  incomeInput,
+  "../data/processed/einkommen_500m_bw.json",
+  (c) => ({ fillColor: c.median_income == null ? noDataColor : classColor(c.median_income, incomeBreaks, incomeColors) }),
+  (c) => ({
+    "Residents (500 m)": c.Einwohner,
+    "Median gross wage per month": c.median_income == null ? "not published" : euro(c.median_income),
+    "Median taken from": c.income_source == null ? "no value in 1 km or 5 km cell" : `${c.income_source.replace("km", " km")} cell`,
+    "Resident employees (share of 1 km cell)": c.employees,
+    "Wage sum per month (employees × median)": c.wage_sum == null ? "no data" : euro(c.wage_sum),
+    "1 km cell": c.cell_1km,
+  })
+);
+
+// Legend, bottom-left: shows only the entries whose switch is on
+const legend = L.control({ position: "bottomleft" });
+legend.onAdd = () => L.DomUtil.create("div", "legend");
+
+const byId = (id) => document.getElementById(id);
+const symbolEntries = [
+  [["show-register", "show-matched"], "dot", "#2563eb", "Charging station (register)"],
+  [["show-register", "show-matched"], "dot", "#f59e0b", "Station in study area"],
+  [["show-register", "show-matched"], "dot", "#16a34a", "Selected station"],
+  [["show-matched"], "dot", matchedColor, "Station in register and historic data"],
+  [["show-historic"], "dot", "#e11d48", "Charging station (historic only, 18 Oct 2026)"],
+  [["parking"], "dot", "#89cff0", "Parking spot (MobiData)"],
+  [["parking-osm"], "dot", "#22c55e", "Parking spot (OSM)"],
+  [["traffic-counters"], "dot", "#0d9488", "Traffic counting site"],
+  [["show-borders"], "box", "#000000", "State border"],
+  [["show-area"], "box", "#2563eb", "Study area / district"],
+  [["population"], "gradient", "linear-gradient(to right, rgba(37,99,235,0.6), rgba(245,158,11,0.6), rgba(220,38,38,0.8))", "Population heatmap (zoom 9+)"],
+];
+const scaleEntries = [
+  ["ev", "EV share of cars, 5 km grid (%)", classLabels(evBreaks), evColors, "no data"],
+  ["ev-500m", "EV index, 500 m grid (residents × share)", classLabels(evPopBreaks), evPopColors, null],
+  ["income-500m", "Median gross wage per month, 500 m grid", classLabels(incomeBreaks, euro), incomeColors, "not published"],
+];
+const swatch = (shape, color, label) =>
+  `<div><span class="swatch ${shape}" style="background:${color}"></span>${label}</div>`;
+
+function renderLegend() {
+  const container = legend.getContainer();
+  if (!container) return;
+  const symbols = symbolEntries.filter(([ids]) => ids.some((id) => byId(id).checked));
+  const scales = scaleEntries.filter(([id]) => byId(id).checked);
+  let html = "";
+  if (symbols.length) html += "<strong>Symbols</strong>" + symbols.map(([, ...entry]) => swatch(...entry)).join("");
+  scales.forEach(([, title, labels, colors, missing]) => {
+    html += `<strong>${title}</strong>` + labels.map((label, i) => swatch("", colors[i], label)).join("");
+    if (missing) html += swatch("", noDataColor, missing);
+  });
+  container.innerHTML = html;
+  container.style.display = html ? "" : "none";
+}
+
+const legendInput = byId("show-legend");
+function applyLegendVisibility() {
+  if (legendInput.checked) {
+    legend.addTo(map);
+    renderLegend();
+  } else {
+    legend.remove();
+  }
+}
+applyLegendVisibility();
+legendInput.addEventListener("change", applyLegendVisibility);
+// Any switch in the side panel can change which entries are shown
+document.querySelector("aside").addEventListener("change", renderLegend);
 
 // Parking sites in Baden-Württemberg (MobiData BW), shown as baby-blue dots
 const parkingInput = document.getElementById("parking");

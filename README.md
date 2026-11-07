@@ -28,8 +28,10 @@ requirements.txt      Python packages
 |---|---|---|
 | `ladesaeulen.json` | 18,863 charging stations in BW | Bundesnetzagentur Ladesäulenregister (1 Sep 2026) |
 | `historie_bw.geojson` | 6,031 BW stations with live status | MobiData BW history, 18 Oct 2026 snapshot |
-| `gemeinden_ev.geojson` | Cars, BEV and plug-in hybrids per municipality in BW | KBA FZ 27.17 and FZ 3.1 (1 Oct 2024), BKG VG250 outlines |
-| `bevoelkerung_1km.json` | Population per 1 km cell in BW | Zensus 2022 grid |
+| `ev_anteil_5km_bw.geojson` | 1,563 5 km cells touching BW with the share of cars with electric drive (%) | KBA 5 km grid (`kba_pkw_elektro_gitterzellen_2025.csv`, added by hand) |
+| `bevoelkerung_500m.json` | Population per 500 m cell in BW (Zensus 100 m cells summed) | Zensus 2022 grid |
+| `einkommen_500m_bw.json` | 49,074 populated 500 m cells: median monthly gross wage at residence (1 km parent, 5 km where not published), resident employees split by population, `wage_sum` = employees × median | Bundesagentur für Arbeit grid data (Dec 2024 / Dec 2025) |
+| `ev_bevoelkerung_500m_bw.json` | 49,074 populated 500 m cells with the parent 5 km EV share and `ev_index` = residents × share | KBA 5 km grid and Zensus 2022 |
 | `parkplaetze_bw.geojson` | 5,882 off-street parking sites in BW | MobiData BW parking data |
 | `kreise_bw.geojson`, `laender.geojson` | District and state outlines | BKG VG250 |
 | `parkplaetze_osm_bw.geojson` | 113,728 parking sites in BW | OpenStreetMap (Overpass API) |
@@ -38,8 +40,10 @@ requirements.txt      Python packages
 | `poi_osm_bw.geojson` | 40,747 POIs in BW: supermarket, retail, office, industrial, hospital, university | OpenStreetMap (Geofabrik extract) |
 | `umspannwerke_osm_bw.geojson` | 12,867 substations in BW, as a rough proxy for grid connection | OpenStreetMap (Geofabrik extract) |
 | `verkehr_svz_bw.geojson` | 5,638 counting sites with 2024 traffic, shown on the map | Verkehrsmonitoring BW 2024 and SVZ station list |
+| `auslastung_taeglich_bw.parquet` | Time-weighted occupancy per BW station and day (charging point-hours, occupancy, peak hour, session starts) | MobiData BW weekly history |
+| `auslastung_bw.xlsx` | Readable report: daily, weekly, weekday profile, per station, station by week | Built from `auslastung_taeglich_bw.parquet` |
 
-Raw files that are not yet used by the map: the KBA 5 km grid with the EV share (`kba_pkw_elektro_gitterzellen_2025.csv`), the KBA stock tables, and the weekly history files.
+Raw files that are not yet used by the map: the KBA stock tables (FZ3, FZ13, FZ27) and the weekly history files.
 
 ## How to run
 
@@ -92,7 +96,6 @@ Ideas raised during development, not yet implemented.
 - Areas to avoid (e.g. protected zones) and phased rollout (stations per year).
 
 **Map layers**
-- 5 km EV-share layer from the KBA grid, shown beside the municipality counts.
 - On-street parking from OpenStreetMap `parking:lane` tags, which the MobiData download excludes.
 - Area-weighted aggregation of the 5 km share to municipalities, as a cross-check.
 
