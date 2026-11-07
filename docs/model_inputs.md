@@ -25,11 +25,14 @@ Derived features: distance to the nearest charger and kW per area. `Inbetriebnah
 
 | Data | Usable features |
 |---|---|
-| `bevoelkerung_1km.json` (21,926 cells) | Population per 1 km cell |
-| `gemeinden_ev.geojson` (1,106 municipalities) | Car, BEV and PHEV counts, EV share per municipality |
-| `data/raw/kba_pkw_elektro_gitterzellen_2025.csv` | EV share per 5 km cell |
+| `bevoelkerung_500m.json` (49,074 cells) | Population per 500 m cell (Zensus 100 m cells summed) |
+| `ev_anteil_5km_bw.geojson` (1,563 cells) | Share of cars with electric drive per 5 km cell (%) |
+| `ev_bevoelkerung_500m_bw.json` (49,074 cells) | Parent 5 km EV share per populated 500 m cell; `ev_index` = residents × share / 100. Each 500 m cell lies fully inside one 5 km cell, so no area split is needed |
+| `einkommen_500m_bw.json` (49,074 cells) | Median monthly gross wage at residence (`median_income`, from the 1 km parent or the 5 km parent where suppressed, see `income_source`), resident employees split by population (`employees`), `wage_sum` = employees × median |
 
-The 5 km grid is raw only. It needs a Baden-Württemberg filter and processing.
+The BA publishes a median only for cells with at least 500 employees; 0 in the raw file means "not published". 8,800 cells (406k residents) have neither a 1 km nor a 5 km median.
+
+Cells marked `-` by the KBA (267 in Germany, 7 in BW) have no published value and are stored as no data.
 
 ## Destinations
 

@@ -7,8 +7,11 @@ import urllib.request
 import zipfile
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
+from shapely.geometry import box
 
+from extract_occupancy import save_daily_occupancy, save_occupancy_workbook
 from extract_traffic import save_traffic_counters
 
 URL = "https://daten.gdz.bkg.bund.de/produkte/vg/vg250_ebenen_0101/2020/vg250_01-01.geo84.shape.ebenen.zip"
@@ -24,16 +27,19 @@ CHARGERS_OUT = Path("data/processed/ladesaeulen.json")
 
 POP_URL = "https://www.destatis.de/static/DE/zensus/gitterdaten/Zensus2022_Bevoelkerungszahl.zip"
 POP_ZIP_PATH = Path("data/raw/zensus2022_bevoelkerung_gitter.zip")
-POP_CSV = "Zensus2022_Bevoelkerungszahl_1km-Gitter.csv"
-POP_OUT = Path("data/processed/bevoelkerung_1km.json")
+POP_CSV = "Zensus2022_Bevoelkerungszahl_100m-Gitter.csv"
+POP_CELL = 500  # 100 m cells are summed into 500 m cells (EPSG:3035, metres)
+POP_OUT = Path("data/processed/bevoelkerung_500m.json")
 
-KBA_URL = "https://www.kba.de/SharedDocs/Downloads/DE/Statistik/Fahrzeuge/"
-FZ3_URL = KBA_URL + "FZ3/fz3_2024.xlsx?__blob=publicationFile&v=2"
-FZ3_PATH = Path("data/raw/kba_fz3_2024.xlsx")
-FZ27_URL = KBA_URL + "FZ27/fz27_202410.xlsx?__blob=publicationFile&v=2"
-FZ27_PATH = Path("data/raw/kba_fz27_202410.xlsx")
-GEM_LAYER = "vg250_01-01.geo84.shape.ebenen/vg250_ebenen_0101/VG250_GEM.shp"
-GEMEINDEN_OUT = Path("data/processed/gemeinden_ev.geojson")
+# KBA share of cars with electric drive per 5 km cell (added by hand, no stable download URL)
+EV_GRID_PATH = Path("data/raw/kba_pkw_elektro_gitterzellen_2025.csv")
+EV_GRID_OUT = Path("data/processed/ev_anteil_5km_bw.geojson")
+EV_POP_OUT = Path("data/processed/ev_bevoelkerung_500m_bw.json")
+# Bundesagentur für Arbeit: median monthly gross wage and employees by place of residence (added by hand)
+INCOME_ZIP_PATH = Path("data/raw/Grunddaten-regionale-Entgelte.zip")
+INCOME_1KM_CSV = "Medianentgelt_1km_WO_202512.csv"
+INCOME_5KM_CSV = "Medianentgelt_5km_WO_202512.csv"
+INCOME_POP_OUT = Path("data/processed/einkommen_500m_bw.json")
 
 PARK_URL = "https://api.mobidata-bw.de/geoserver/MobiData-BW/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=MobiData-BW%3Apark-api_car&cql_filter=type%3C%3E%27ON_STREET%27%20OR%20type%20is%20NULL&maxFeatures=30000&outputFormat=csv"
 PARK_CSV_PATH = Path("data/raw/parkplaetze_bw_wfs.csv")
@@ -107,80 +113,155 @@ def save_chargers():
     print(f"{len(chargers)} charging stations saved to {CHARGERS_OUT}")
 
 
+def read_bw_population_cells():
+    """Zensus 2022 100 m cells summed to 500 m cells; populated cells whose centre lies in Baden-Württemberg, as lat/lon points."""
+    if not POP_ZIP_PATH.exists():
+        urllib.request.urlretrieve(POP_URL, POP_ZIP_PATH)
+    with zipfile.ZipFile(POP_ZIP_PATH) as archive:
+        with archive.open(POP_CSV) as file:
+            cells = pd.read_csv(file, sep=";", usecols=["x_mp_100m", "y_mp_100m", "Einwohner"])
+    cells["Einwohner"] = pd.to_numeric(cells["Einwohner"], errors="coerce")
+    cells = cells[cells["Einwohner"] > 0]
+    # Both grids are EPSG:3035 and aligned: each 500 m cell holds exactly 5 x 5 cells of 100 m
+    cells["x_ll"] = cells["x_mp_100m"] // POP_CELL * POP_CELL
+    cells["y_ll"] = cells["y_mp_100m"] // POP_CELL * POP_CELL
+    cells = cells.groupby(["x_ll", "y_ll"], as_index=False)["Einwohner"].sum()
+    cells["x_mp"] = cells["x_ll"] + POP_CELL // 2
+    cells["y_mp"] = cells["y_ll"] + POP_CELL // 2
+    cells["cell_id"] = f"CRS3035RES{POP_CELL}mN" + cells["y_ll"].astype(str) + "E" + cells["x_ll"].astype(str)
+    # Cell centres are in EPSG:3035 (metres); the map needs lat/lon
+    points = gpd.GeoDataFrame(
+        cells[["cell_id", "x_mp", "y_mp", "Einwohner"]],
+        geometry=gpd.points_from_xy(cells["x_mp"], cells["y_mp"], crs="EPSG:3035").to_crs("EPSG:4326"),
+    )
+    states = gpd.read_file(STATES_OUT)
+    return gpd.sjoin(points, states[states["AGS"] == "08"][["geometry"]], predicate="within").drop(columns="index_right")
+
+
 def save_population():
     if POP_OUT.exists():
         print(f"{POP_OUT} already exists, skipping")
         return
-    if not POP_ZIP_PATH.exists():
-        urllib.request.urlretrieve(POP_URL, POP_ZIP_PATH)
-
-    with zipfile.ZipFile(POP_ZIP_PATH) as archive:
-        with archive.open(POP_CSV) as file:
-            cells = pd.read_csv(file, sep=";")
-    cells["Einwohner"] = pd.to_numeric(cells["Einwohner"], errors="coerce")
-    cells = cells[cells["Einwohner"] > 0]
-    # Cell centres are in EPSG:3035 (metres); the map needs lat/lon
-    points = gpd.GeoDataFrame(
-        {"Einwohner": cells["Einwohner"].values},
-        geometry=gpd.points_from_xy(cells["x_mp_1km"], cells["y_mp_1km"], crs="EPSG:3035").to_crs("EPSG:4326"),
-    )
-    # Keep only cells whose centre lies inside Baden-Württemberg
-    states = gpd.read_file(STATES_OUT)
-    points = gpd.sjoin(points, states[states["AGS"] == "08"][["geometry"]], predicate="within")
+    points = read_bw_population_cells()
     rows = list(zip(points.geometry.y.tolist(), points.geometry.x.tolist(), points["Einwohner"].tolist()))
     with open(POP_OUT, "w", encoding="utf-8") as file:
         json.dump(rows, file)
-    print(f"{len(rows)} populated 1 km cells saved to {POP_OUT}")
+    print(f"{len(rows)} populated {POP_CELL} m cells saved to {POP_OUT}")
 
 
-def read_ev_by_municipality():
-    # FZ 27.17: car counts per municipality, no key; the district (Zulassungsbezirk) is only on the first row of each block
-    ev = pd.read_excel(FZ27_PATH, sheet_name="FZ 27.17", header=None).iloc[:, 1:10]
-    ev.columns = ["land", "bezirk", "gemeinde", "gew_pkw", "gew_bev", "gew_phev", "priv_pkw", "priv_bev", "priv_phev"]
-    ev["bezirk"] = ev["bezirk"].ffill()
-    ev = ev[ev["bezirk"].astype(str).str.match(r"\d{5}") & ev["gemeinde"].notna()]
-    ev = ev[ev["gemeinde"].astype(str).str.upper() != "ZUSAMMEN"]
-    ev["bez5"] = ev["bezirk"].astype(str).str[:5]
-    ev["name"] = ev["gemeinde"].astype(str).str.strip()
-    return ev
-
-
-def read_municipality_keys():
-    # FZ 3.1 has the 8-digit AGS next to each municipality name
-    keys = pd.read_excel(FZ3_PATH, sheet_name="FZ 3.1", header=None).iloc[:, 2:4]
-    keys.columns = ["bezirk", "gemeinde_ags"]
-    keys["bezirk"] = keys["bezirk"].ffill()
-    keys = keys[keys["bezirk"].astype(str).str.match(r"\d{5}") & keys["gemeinde_ags"].astype(str).str.match(r"\d{8} ")]
-    keys["bez5"] = keys["bezirk"].str[:5]
-    keys["ags"] = keys["gemeinde_ags"].str[:8]
-    keys["name"] = keys["gemeinde_ags"].str[9:].str.strip()
-    return keys.drop_duplicates(["bez5", "name"])[["bez5", "name", "ags"]]
-
-
-def save_ev_municipalities():
-    if GEMEINDEN_OUT.exists():
-        print(f"{GEMEINDEN_OUT} already exists, skipping")
+def save_ev_grid():
+    if EV_GRID_OUT.exists():
+        print(f"{EV_GRID_OUT} already exists, skipping")
         return
-    for url, path in [(FZ3_URL, FZ3_PATH), (FZ27_URL, FZ27_PATH), (URL, ZIP_PATH)]:
-        if not path.exists():
-            urllib.request.urlretrieve(url, path)
+    if not EV_GRID_PATH.exists():
+        raise FileNotFoundError(f"{EV_GRID_PATH} is missing; download the KBA 5 km grid by hand")
 
-    ev = read_ev_by_municipality().merge(read_municipality_keys(), on=["bez5", "name"], how="inner")
-    counts = ["gew_pkw", "gew_bev", "gew_phev", "priv_pkw", "priv_bev", "priv_phev"]
-    ev[counts] = ev[counts].apply(pd.to_numeric, errors="coerce")
-    per_ags = ev.groupby("ags")[counts].sum()
-    per_ags["pkw"] = per_ags["gew_pkw"] + per_ags["priv_pkw"]
-    per_ags["bev"] = per_ags["gew_bev"] + per_ags["priv_bev"]
-    per_ags["phev"] = per_ags["gew_phev"] + per_ags["priv_phev"]
+    cells = pd.read_csv(EV_GRID_PATH, encoding="utf-8-sig")
+    # Cell IDs like "5kmN2685E4340" give the lower-left corner in km, EPSG:3035
+    corner = cells["5km-Gitterzelle-ID"].str.extract(r"N(\d+)E(\d+)").astype(int) * 1000
+    north, east = corner[0], corner[1]
+    squares = [box(e, n, e + 5000, n + 5000) for e, n in zip(east, north)]
+    # "-" in the ZS column marks cells without a published value (stored as 0); keep them as no data
+    share = cells["Anteil (in%)"].where(cells["ZS_Anteil_Pkw_mit_Elektro-Antrieb"] != "-")
+    grid = gpd.GeoDataFrame(
+        {"cell_id": cells["5km-Gitterzelle-ID"], "ev_share": share, "year": cells["Berichtsjahr"]},
+        geometry=squares,
+        crs="EPSG:3035",
+    ).to_crs("EPSG:4326")
+    # Keep cells that touch Baden-Württemberg (border cells included)
+    states = gpd.read_file(STATES_OUT)
+    bw = states[states["AGS"] == "08"][["geometry"]].to_crs("EPSG:4326")
+    grid = gpd.sjoin(grid, bw, predicate="intersects").drop(columns="index_right")
+    grid = grid.drop_duplicates("cell_id")
+    grid.to_file(EV_GRID_OUT, driver="GeoJSON")
+    print(f"{len(grid)} 5 km cells ({grid['ev_share'].notna().sum()} with EV share) saved to {EV_GRID_OUT}")
 
-    gemeinden = gpd.read_file(f"/vsizip/{ZIP_PATH.as_posix()}/{GEM_LAYER}", encoding="utf-8")[["AGS", "GEN", "geometry"]]
-    # AGS 08 = Baden-Württemberg
-    gemeinden = gemeinden[gemeinden["AGS"].str.startswith("08")]
-    gemeinden = gemeinden.merge(per_ags[["pkw", "bev", "phev"]], left_on="AGS", right_index=True, how="left")
-    # Simplify outlines (about 100 m) to keep the file small enough for the browser
-    gemeinden["geometry"] = gemeinden.geometry.simplify(0.001, preserve_topology=True)
-    gemeinden.to_file(GEMEINDEN_OUT, driver="GeoJSON")
-    print(f"{gemeinden['bev'].notna().sum()} of {len(gemeinden)} municipalities with EV counts saved to {GEMEINDEN_OUT}")
+
+def save_ev_population_grid():
+    # Dasymetric step: each 500 m cell keeps the EV share of its 5 km parent cell and is weighted by its residents.
+    # ev_index = residents x share; cells without residents get no EVs, and the population-weighted
+    # mean share of the 100 children equals the published 5 km share.
+    if EV_POP_OUT.exists():
+        print(f"{EV_POP_OUT} already exists, skipping")
+        return
+    if not EV_GRID_PATH.exists():
+        raise FileNotFoundError(f"{EV_GRID_PATH} is missing; download the KBA 5 km grid by hand")
+
+    shares = pd.read_csv(EV_GRID_PATH, encoding="utf-8-sig")
+    shares["ev_share"] = shares["Anteil (in%)"].where(shares["ZS_Anteil_Pkw_mit_Elektro-Antrieb"] != "-")
+    shares = shares.rename(columns={"5km-Gitterzelle-ID": "cell_5km"})[["cell_5km", "ev_share"]]
+
+    cells = read_bw_population_cells()
+    # Both grids are EPSG:3035 and aligned, so the parent is the 5 km cell containing the 500 m centre
+    north = (cells["y_mp"] // 5000 * 5).astype(int).astype(str)
+    east = (cells["x_mp"] // 5000 * 5).astype(int).astype(str)
+    cells["cell_5km"] = "5kmN" + north + "E" + east
+    cells = cells.merge(shares, on="cell_5km", how="left")
+    cells["ev_index"] = (cells["Einwohner"] * cells["ev_share"] / 100).round(1)
+
+    columns = ["lat", "lon", "Einwohner", "ev_share", "ev_index", "cell_5km"]
+    rows = [
+        [round(p.y, 5), round(p.x, 5), int(e), None if pd.isna(s) else s, None if pd.isna(i) else i, c]
+        for p, e, s, i, c in zip(cells.geometry, cells["Einwohner"], cells["ev_share"], cells["ev_index"], cells["cell_5km"])
+    ]
+    with open(EV_POP_OUT, "w", encoding="utf-8") as file:
+        json.dump({"columns": columns, "rows": rows}, file)
+    print(f"{len(rows)} {POP_CELL} m cells ({cells['ev_share'].notna().sum()} with EV share) saved to {EV_POP_OUT}")
+
+
+def _read_income_grid(archive, name):
+    # Bundesagentur für Arbeit grid: ";" separator, "." thousands separator, cp1252; trailing rows are empty
+    with archive.open(name) as file:
+        grid = pd.read_csv(file, sep=";", encoding="cp1252", thousands=".", dtype={"Gitter-ID": str})
+    grid.columns = ["cell", "median_eur", "employees"]
+    grid = grid.dropna(subset=["cell"])
+    # A median is only published for cells with at least 500 employees; 0 means "not published"
+    grid["median_eur"] = grid["median_eur"].where(grid["median_eur"] > 0)
+    return grid.set_index("cell")
+
+
+def save_income_population_grid():
+    # Each 500 m cell takes the median wage of its 1 km parent (or of its 5 km parent where the 1 km value
+    # is not published). The median is an intensive value, so it is assigned, not split. The employee
+    # count is a count, so the 1 km value is split over the 500 m children by their share of residents.
+    if INCOME_POP_OUT.exists():
+        print(f"{INCOME_POP_OUT} already exists, skipping")
+        return
+    if not INCOME_ZIP_PATH.exists():
+        raise FileNotFoundError(f"{INCOME_ZIP_PATH} is missing; download the BA grid data by hand")
+    with zipfile.ZipFile(INCOME_ZIP_PATH) as archive:
+        grid_1km = _read_income_grid(archive, INCOME_1KM_CSV)
+        grid_5km = _read_income_grid(archive, INCOME_5KM_CSV)
+
+    cells = read_bw_population_cells()
+    # All grids are EPSG:3035 and aligned; parent IDs come from the 500 m cell centre
+    cells["cell_1km"] = ("1kmN" + (cells["y_mp"] // 1000).astype(int).astype(str)
+                         + "E" + (cells["x_mp"] // 1000).astype(int).astype(str))
+    cells["cell_5km"] = ("5kmN" + (cells["y_mp"] // 5000 * 5).astype(int).astype(str)
+                         + "E" + (cells["x_mp"] // 5000 * 5).astype(int).astype(str))
+    median_1km = cells["cell_1km"].map(grid_1km["median_eur"])
+    median_5km = cells["cell_5km"].map(grid_5km["median_eur"])
+    cells["median_income"] = median_1km.fillna(median_5km)
+    cells["income_source"] = np.select([median_1km.notna(), median_5km.notna()], ["1km", "5km"], default=None)
+
+    # Residents of each 1 km parent = sum over its 500 m children in BW
+    parent_pop = cells.groupby("cell_1km")["Einwohner"].transform("sum")
+    cells["employees"] = (cells["cell_1km"].map(grid_1km["employees"]).fillna(0) * cells["Einwohner"] / parent_pop).round(1)
+    # Monthly gross wage sum of resident employees (EUR), a purchasing-power proxy
+    cells["wage_sum"] = (cells["employees"] * cells["median_income"]).round(0)
+
+    columns = ["lat", "lon", "Einwohner", "median_income", "income_source", "employees", "wage_sum", "cell_1km"]
+    rows = [
+        [round(p.y, 5), round(p.x, 5), int(e), None if pd.isna(m) else m, None if pd.isna(s) else s, emp,
+         None if pd.isna(w) else w, c]
+        for p, e, m, s, emp, w, c in zip(cells.geometry, cells["Einwohner"], cells["median_income"],
+                                         cells["income_source"], cells["employees"], cells["wage_sum"], cells["cell_1km"])
+    ]
+    with open(INCOME_POP_OUT, "w", encoding="utf-8") as file:
+        json.dump({"columns": columns, "rows": rows}, file)
+    counts = cells["income_source"].value_counts()
+    print(f"{len(rows)} {POP_CELL} m cells (median from 1 km: {counts.get('1km', 0)}, from 5 km: {counts.get('5km', 0)}) "
+          f"saved to {INCOME_POP_OUT}")
 
 
 def _load_parking_csv(path, columns):
@@ -444,7 +525,9 @@ def main():
     save_states()
     save_chargers()
     save_population()
-    save_ev_municipalities()
+    save_ev_grid()
+    save_ev_population_grid()
+    save_income_population_grid()
     save_parking()
     save_historic_stations()
     save_osm_parking()
@@ -453,6 +536,8 @@ def main():
     save_osm_pois()
     save_osm_substations()
     save_traffic_counters()
+    save_daily_occupancy()
+    save_occupancy_workbook()
 
 
 if __name__ == "__main__":
