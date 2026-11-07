@@ -372,7 +372,7 @@ gridLayer(
   })
 );
 
-// 500 m cells: median monthly gross wage at residence (BA), from the 1 km parent or the 5 km parent
+// 500 m cells: median monthly gross wage at residence (BA), from the 1 km parent, else the 5 km parent, else the district
 const incomeBreaks = [3800, 4100, 4300, 4500, 4700, 5000, 5500];
 const incomeColors = ["#faf5ff", "#f3e8ff", "#e9d5ff", "#d8b4fe", "#c084fc", "#a855f7", "#7e22ce", "#4c1d95"];
 const incomeInput = document.getElementById("income-500m");
@@ -384,7 +384,7 @@ gridLayer(
   (c) => ({
     "Residents (500 m)": c.Einwohner,
     "Median gross wage per month": c.median_income == null ? "not published" : euro(c.median_income),
-    "Median taken from": c.income_source == null ? "no value in 1 km or 5 km cell" : `${c.income_source.replace("km", " km")} cell`,
+    "Median taken from": { "1km": "1 km cell", "5km": "5 km cell", kreis: "district (Kreis)" }[c.income_source] || "no data",
     "Resident employees (share of 1 km cell)": c.employees,
     "Wage sum per month (employees × median)": c.wage_sum == null ? "no data" : euro(c.wage_sum),
     "1 km cell": c.cell_1km,
@@ -412,7 +412,7 @@ const symbolEntries = [
 const scaleEntries = [
   ["ev", "EV share of cars, 5 km grid (%)", classLabels(evBreaks), evColors, "no data"],
   ["ev-500m", "EV index, 500 m grid (residents × share)", classLabels(evPopBreaks), evPopColors, null],
-  ["income-500m", "Median gross wage per month, 500 m grid", classLabels(incomeBreaks, euro), incomeColors, "not published"],
+  ["income-500m", "Median gross wage per month, 500 m grid", classLabels(incomeBreaks, euro), incomeColors, null],
 ];
 const swatch = (shape, color, label) =>
   `<div><span class="swatch ${shape}" style="background:${color}"></span>${label}</div>`;
