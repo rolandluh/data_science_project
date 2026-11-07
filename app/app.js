@@ -402,8 +402,7 @@ const symbolEntries = [
   [["show-register", "show-matched"], "dot", "#16a34a", "Selected station"],
   [["show-matched"], "dot", matchedColor, "Station in register and historic data"],
   [["show-historic"], "dot", "#e11d48", "Charging station (historic only, 18 Oct 2026)"],
-  [["parking"], "dot", "#89cff0", "Parking spot (MobiData)"],
-  [["parking-osm"], "dot", "#22c55e", "Parking spot (OSM)"],
+  [["parking"], "dot", "#22c55e", "Parking spot (MobiData + OSM)"],
   [["traffic-counters"], "dot", "#0d9488", "Traffic counting site"],
   [["show-borders"], "box", "#000000", "State border"],
   [["show-area"], "box", "#2563eb", "Study area / district"],
@@ -446,34 +445,9 @@ legendInput.addEventListener("change", applyLegendVisibility);
 // Any switch in the side panel can change which entries are shown
 document.querySelector("aside").addEventListener("change", renderLegend);
 
-// Parking sites in Baden-Württemberg (MobiData BW), shown as baby-blue dots
+// Parking sites in Baden-Württemberg (OSM joined with MobiData BW within 10 m, plus unmatched MobiData), shown as green dots
 const parkingInput = document.getElementById("parking");
 const parkingLayer = L.geoJSON(null, {
-  pointToLayer: (feature, latlng) =>
-    L.circleMarker(latlng, {
-      radius: 4,
-      color: "#89CFF0",
-      fillColor: "#89CFF0",
-      fillOpacity: 0.9,
-      weight: 1,
-      bubblingMouseEvents: false,
-    }),
-  onEachFeature: (feature, layer) => layer.bindPopup(() => popupHtml(feature.properties)),
-}).addTo(map);
-
-fetch("../data/processed/parkplaetze_bw.geojson")
-  .then((response) => response.json())
-  .then((data) => parkingLayer.addData(data))
-  .catch((error) => console.error("Could not load parking sites", error));
-
-parkingInput.addEventListener("change", () => {
-  if (parkingInput.checked) parkingLayer.addTo(map);
-  else map.removeLayer(parkingLayer);
-});
-
-// OSM parking spots in Baden-Württemberg, shown as green dots
-const parkingOsmInput = document.getElementById("parking-osm");
-const parkingOsmLayer = L.geoJSON(null, {
   pointToLayer: (feature, latlng) =>
     L.circleMarker(latlng, {
       radius: 3,
@@ -484,19 +458,16 @@ const parkingOsmLayer = L.geoJSON(null, {
       bubblingMouseEvents: false,
     }),
   onEachFeature: (feature, layer) => layer.bindPopup(() => popupHtml(feature.properties)),
-});
+}).addTo(map);
 
-fetch("../data/processed/parkplaetze_osm_bw.geojson")
+fetch("../data/processed/parkplaetze_kombiniert_bw.geojson")
   .then((response) => response.json())
-  .then((data) => {
-    parkingOsmLayer.addData(data);
-    console.log(`${data.features.length} OSM parking features loaded`);
-  })
-  .catch((error) => console.warn("OSM parking not loaded (file may not exist yet)", error));
+  .then((data) => parkingLayer.addData(data))
+  .catch((error) => console.error("Could not load parking sites", error));
 
-parkingOsmInput.addEventListener("change", () => {
-  if (parkingOsmInput.checked) parkingOsmLayer.addTo(map);
-  else map.removeLayer(parkingOsmLayer);
+parkingInput.addEventListener("change", () => {
+  if (parkingInput.checked) parkingLayer.addTo(map);
+  else map.removeLayer(parkingLayer);
 });
 
 // Traffic counting sites (Verkehrsmonitoring BW) as teal dots

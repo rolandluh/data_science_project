@@ -35,6 +35,7 @@ requirements.txt      Python packages
 | `parkplaetze_bw.geojson` | 5,882 off-street parking sites in BW | MobiData BW parking data |
 | `kreise_bw.geojson`, `laender.geojson` | District and state outlines | BKG VG250 |
 | `parkplaetze_osm_bw.geojson` | 113,728 parking sites in BW | OpenStreetMap (Overpass API) |
+| `parkplaetze_kombiniert_bw.geojson` | 139,864 parking sites shown on the map: OSM base (111,389 OSM only, 2,339 with MobiData attributes joined within 10 m) plus 26,136 unmatched MobiData sites; `source` column marks the origin | `parkplaetze_osm_bw.geojson` and `parkplaetze_bw.geojson` |
 | `strassen_osm_bw.geojson` | 43,831 road segments in BW: motorway, trunk, primary | OpenStreetMap (Geofabrik extract) |
 | `strassenpunkte_osm_bw.geojson` | 1,512 motorway junctions, rest areas and service areas in BW | OpenStreetMap (Geofabrik extract) |
 | `poi_osm_bw.geojson` | 40,747 POIs in BW: supermarket, retail, office, industrial, hospital, university | OpenStreetMap (Geofabrik extract) |

@@ -61,8 +61,9 @@ Traffic counts exist only at the counting sites, so traffic between them has to 
 |---|---|
 | `parkplaetze_bw.geojson` (28,475 sites) | Location, capacity, `capacity_charging`, fees, opening hours, max stay |
 | `parkplaetze_osm_bw.geojson` (113,728 sites) | Location, access, capacity (21% filled), fee |
+| `parkplaetze_kombiniert_bw.geojson` (139,864 sites) | Union of both: OSM base with MobiData attributes joined within 10 m (`source` = `osm`, `mobidata`, `osm+mobidata`); capacity 36% filled |
 
-Exclude the 22,422 OSM sites tagged `access=private`.
+Exclude the 22,422 OSM sites tagged `access=private` (also in the combined file).
 
 ## Infrastructure constraint
 

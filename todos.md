@@ -23,7 +23,7 @@ My priority is roads/traffic, the 5 km EV grid and OSM POIs. The others can wait
 **Housekeeping (now)**
 - Create a branch and commit or stash the dirty `app/` and `CLAUDE.md` changes. They're sitting on `main`, and the last commit says the map is "buggy right now".
 - Find and fix the map bugs.
-- Add `parkplaetze_osm_bw.geojson` (`save_osm_parking()`) to the CLAUDE.md pipeline table.
+- ~~Add `parkplaetze_osm_bw.geojson` (`save_osm_parking()`) to the CLAUDE.md pipeline table.~~ Done.
 - Check what `test.py` is. Move it into a tests folder or remove it.
 - Remove the Zensus API key from the team's data-source note.
 - Commit `docs/project_outline.md` (related work) and `todos.md`.

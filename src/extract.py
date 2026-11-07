@@ -331,6 +331,53 @@ def save_parking():
     print(f"{len(parking)} parking sites saved to {PARK_OUT}")
 
 
+COMBINED_PARK_OUT = Path("data/processed/parkplaetze_kombiniert_bw.geojson")
+PARK_MATCH_M = 10  # max distance between an OSM and a MobiData parking site to count as the same site
+OSM_PARK_COLUMNS = ["osm_id", "osm_type", "parking", "access", "fee", "surface"]
+
+
+def save_combined_parking():
+    """OSM parking is the base; MobiData attributes are joined on within PARK_MATCH_M, unmatched MobiData sites are appended."""
+    if COMBINED_PARK_OUT.exists():
+        print(f"{COMBINED_PARK_OUT} already exists, skipping")
+        return
+    save_parking()
+    save_osm_parking()
+    # Metric CRS for the distance threshold
+    osm = gpd.read_file(OSM_PARK_OUT).to_crs(25832).reset_index(drop=True)
+    mobi = gpd.read_file(PARK_OUT).to_crs(25832).reset_index(drop=True)
+    mobi["_mobi_id"] = mobi.index
+
+    joined = gpd.sjoin_nearest(
+        osm, mobi, how="left", max_distance=PARK_MATCH_M, distance_col="_dist", lsuffix="osm", rsuffix="mobi"
+    )
+    # Ties give several rows per OSM site; keep one. Each MobiData site is attached to its closest OSM site only.
+    joined = joined.sort_values("_dist").drop_duplicates(["osm_id", "osm_type"])
+    # Further OSM sites near an already attached MobiData site stay as plain OSM sites without MobiData attributes
+    extra = joined["_mobi_id"].notna() & joined.duplicated("_mobi_id")
+    mobi_cols = [c for c in joined.columns if c.endswith("_mobi") or c in PARK_COLUMNS or c == "_mobi_id"]
+    joined.loc[extra, mobi_cols] = None
+    matched = joined[joined["_mobi_id"].notna()]
+
+    # Columns that exist in both sources get the MobiData value, with the OSM value as fallback
+    joined["name"] = joined["name_mobi"].combine_first(joined["name_osm"])
+    joined["operator_name"] = joined["operator_name"].combine_first(joined["operator"])
+    joined["capacity"] = pd.to_numeric(joined["capacity_mobi"], errors="coerce").combine_first(
+        pd.to_numeric(joined["capacity_osm"], errors="coerce"))
+    joined["source"] = np.where(joined["_mobi_id"].notna(), "osm+mobidata", "osm")
+
+    columns = PARK_COLUMNS + OSM_PARK_COLUMNS + ["source"]
+    both = joined.reindex(columns=columns + ["geometry"])
+    mobi_only = mobi[~mobi["_mobi_id"].isin(matched["_mobi_id"])].copy()
+    mobi_only["source"] = "mobidata"
+    mobi_only["capacity"] = pd.to_numeric(mobi_only["capacity"], errors="coerce")
+    combined = pd.concat([both, mobi_only.reindex(columns=columns + ["geometry"])], ignore_index=True)
+    combined = gpd.GeoDataFrame(combined, geometry="geometry", crs=25832).to_crs(4326)
+    combined.to_file(COMBINED_PARK_OUT, driver="GeoJSON")
+    counts = combined["source"].value_counts().to_dict()
+    print(f"{len(combined)} combined parking sites saved to {COMBINED_PARK_OUT} ({counts})")
+
+
 def save_historic_stations():
     if HIST_OUT.exists():
         print(f"{HIST_OUT} already exists, skipping")
@@ -553,6 +600,7 @@ def main():
     save_parking()
     save_historic_stations()
     save_osm_parking()
+    save_combined_parking()
     save_osm_roads()
     save_osm_road_points()
     save_osm_pois()
