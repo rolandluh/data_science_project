@@ -16,7 +16,8 @@ Derived features: distance to the nearest charger and kW per area. `Inbetriebnah
 
 | Data | Usable features |
 |---|---|
-| `historie_parquet/` (weeks 05–40) | Time-weighted occupancy per station, hourly and weekday profiles, out-of-order share |
+| `auslastung_taeglich_bw.parquet` (8,189 stations, 866,235 station-days) | Time-weighted daily occupancy, charging point-hours, peak-hour occupancy, session starts, validity flag (see `data_mobidata_bw_historic.md`) |
+| `historie_parquet/` (weeks 05–40) | Raw status history, e.g. for hourly profiles or out-of-order share |
 | `historie_bw.geojson` (6,031 stations) | Station locations, operator, source, max power |
 
 `historie_bw.geojson` is the join key between usage and location.
@@ -75,7 +76,7 @@ This is a rough proxy for grid connection. It shows where substations are, not t
 
 | Data | Usable features |
 |---|---|
-| `kreise_bw.geojson`, `laender.geojson`, municipality outlines in `gemeinden_ev.geojson` | Results per district or municipality, equity checks, Baden-Württemberg filter |
+| `kreise_bw.geojson`, `laender.geojson` | Results per district, equity checks, Baden-Württemberg filter. Municipality outlines are in the raw VG250 ZIP (`VG250_GEM.shp`) but not processed |
 
 ## Still missing
 

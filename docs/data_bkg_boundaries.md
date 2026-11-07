@@ -40,8 +40,7 @@ The ZIP contains multiple administrative levels. Three are used:
 | Features | ~11,000 municipalities Germany-wide |
 | Key fields | AGS (8-digit code), GEN (name) |
 | BW filter | AGS starts with "08" |
-| Used for | Joining KBA vehicle counts to geographic shapes |
-| Processed output | `data/processed/gemeinden_ev.geojson` (3.1 MB, with EV data merged) |
+| Status | **Not used anymore.** It joined the KBA FZ27 municipality counts, which were replaced by the KBA 5 km EV grid. The old output `gemeinden_ev.geojson` is no longer produced |
 
 ## Processing
 

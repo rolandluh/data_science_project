@@ -1,5 +1,7 @@
 # Historic Charger Data: Weekly File Comparison
 
+> **Update:** a later check of rows per snapshot dates the switch to change-only deltas to **14 Aug 2026, 17:04** (week 33), not 17 Aug. The week 38 anomaly comes from static `bnetza_api` register dumps. See `data_mobidata_bw_historic.md`.
+
 **Source:** `data/raw/historie/*_ladesaeulen_woche.csv.gz`, analysed by `week_metrics.py` (scratchpad, not in the repo)
 **Coverage:** Weeks 202605 to 202640 (36 weeks).
 **Definitions:** `share>0` = share of rows with `chargepoint_charging_count > 0`; `gap_med_min` = median over stations of each station's median gap between distinct update timestamps.

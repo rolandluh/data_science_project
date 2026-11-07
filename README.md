@@ -43,7 +43,9 @@ requirements.txt      Python packages
 | `auslastung_taeglich_bw.parquet` | Time-weighted occupancy per BW station and day (charging point-hours, occupancy, peak hour, session starts) | MobiData BW weekly history |
 | `auslastung_bw.xlsx` | Readable report: daily, weekly, weekday profile, per station, station by week | Built from `auslastung_taeglich_bw.parquet` |
 
-Raw files that are not yet used by the map: the KBA stock tables (FZ3, FZ13, FZ27) and the weekly history files.
+Raw files that are not used: the KBA stock tables (FZ3, FZ13, FZ27). The weekly history files feed the occupancy step but are not shown on the map.
+
+Data source details: `docs/data_*.md` (one file per source) and `docs/data_sources_summary.md`.
 
 ## How to run
 
@@ -60,8 +62,10 @@ The history download is separate and large (about 20 GB for all weeks in 2026). 
 - OSM data depends on volunteer mapping. Tags can be incomplete: only 21% of substations have a voltage, and 6,100 of the 12,867 are tagged `minor_distribution`.
 - Usage is a snapshot, not a session record: utilisation is estimated from charge-point status.
 - The historic feed covers stations across Europe; the BW subset is biased toward networks with live feeds. It covers only about a third of the stations in the register and over-represents larger networks, so utilisation estimates from it may not hold for smaller operators or for regions they serve.
-- The historic data is used as it is, including the week 34 drop in rows and the week 38 anomaly (agreed with the supervisor). Utilisation features are therefore not normalised for these changes.
-- Municipality car counts are from 1 Oct 2024 and spread evenly within municipalities for any finer analysis.
+- The historic data is used as it is (agreed with the supervisor). The feed switched to change-only deltas on 14 Aug 2026, 17:04, so occupancy is time-weighted per station rather than averaged over rows. Static `bnetza_api` rows (the cause of the week 38 anomaly) are dropped.
+- In weeks 25–26 and 29–31 only about half the station-days reach 18 h of live status; the cause has not been checked.
+- The EV share and income are published per 5 km and 1 km cell. Within a cell they are assigned evenly to all populated 500 m cells; only population varies at 500 m.
+- Income covers full-time employees only. Sparse cells without a published median take the 5 km or district median.
 
 ## Different ideas
 
