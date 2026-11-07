@@ -32,7 +32,7 @@ Each `save_*()` function skips if its output file already exists. Delete the out
 | `save_population()` | `bevoelkerung_500m.json` | Zensus 2022 (100 m cells summed to 500 m) |
 | `save_ev_grid()` | `ev_anteil_5km_bw.geojson` | KBA 5 km grid (EV share, raw CSV added by hand) |
 | `save_ev_population_grid()` | `ev_bevoelkerung_500m_bw.json` | 5 km EV share × Zensus 500 m residents (population-weighted) |
-| `save_income_population_grid()` | `einkommen_500m_bw.json` | BA median wage (1 km, 5 km fallback) + employees split by residents (`Grunddaten-regionale-Entgelte.zip`, added by hand) |
+| `save_income_population_grid()` | `einkommen_500m_bw.json` | BA median wage (1 km → 5 km → district fallback) + employees split by residents (`Grunddaten-regionale-Entgelte.zip` and `entgelt_kreise_wohnort_202512.xlsx`, added by hand) |
 | `save_parking()` | `parkplaetze_bw.geojson` | MobiData BW (off-street + street) |
 | `save_osm_parking()` | `parkplaetze_osm_bw.geojson` | OpenStreetMap (Overpass API, `amenity=parking`) |
 | `save_osm_roads()` | `strassen_osm_bw.geojson` | OpenStreetMap (Geofabrik PBF): motorway, trunk, primary |

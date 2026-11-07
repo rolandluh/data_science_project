@@ -30,7 +30,7 @@ requirements.txt      Python packages
 | `historie_bw.geojson` | 6,031 BW stations with live status | MobiData BW history, 18 Oct 2026 snapshot |
 | `ev_anteil_5km_bw.geojson` | 1,563 5 km cells touching BW with the share of cars with electric drive (%) | KBA 5 km grid (`kba_pkw_elektro_gitterzellen_2025.csv`, added by hand) |
 | `bevoelkerung_500m.json` | Population per 500 m cell in BW (Zensus 100 m cells summed) | Zensus 2022 grid |
-| `einkommen_500m_bw.json` | 49,074 populated 500 m cells: median monthly gross wage at residence (1 km parent, 5 km where not published), resident employees split by population, `wage_sum` = employees × median | Bundesagentur für Arbeit grid data (Dec 2024 / Dec 2025) |
+| `einkommen_500m_bw.json` | 49,074 populated 500 m cells: median monthly gross wage at residence (1 km parent, else 5 km parent, else district), resident employees split by population, `wage_sum` = employees × median | Bundesagentur für Arbeit grid data (Dec 2024 / Dec 2025) and district table by place of residence (sheet 9.1, 31 Dec 2025) |
 | `ev_bevoelkerung_500m_bw.json` | 49,074 populated 500 m cells with the parent 5 km EV share and `ev_index` = residents × share | KBA 5 km grid and Zensus 2022 |
 | `parkplaetze_bw.geojson` | 5,882 off-street parking sites in BW | MobiData BW parking data |
 | `kreise_bw.geojson`, `laender.geojson` | District and state outlines | BKG VG250 |

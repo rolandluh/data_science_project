@@ -39,6 +39,9 @@ EV_POP_OUT = Path("data/processed/ev_bevoelkerung_500m_bw.json")
 INCOME_ZIP_PATH = Path("data/raw/Grunddaten-regionale-Entgelte.zip")
 INCOME_1KM_CSV = "Medianentgelt_1km_WO_202512.csv"
 INCOME_5KM_CSV = "Medianentgelt_5km_WO_202512.csv"
+# BA Entgeltstatistik by district, place of residence, full-time core group, 31 Dec 2025 (added by hand)
+INCOME_KREIS_PATH = Path("data/raw/entgelt_kreise_wohnort_202512.xlsx")
+INCOME_KREIS_SHEET = "9.1"
 INCOME_POP_OUT = Path("data/processed/einkommen_500m_bw.json")
 
 PARK_URL = "https://api.mobidata-bw.de/geoserver/MobiData-BW/ows?service=WFS&version=1.0.0&request=GetFeature&typeName=MobiData-BW%3Apark-api_car&cql_filter=type%3C%3E%27ON_STREET%27%20OR%20type%20is%20NULL&maxFeatures=30000&outputFormat=csv"
@@ -220,18 +223,29 @@ def _read_income_grid(archive, name):
     return grid.set_index("cell")
 
 
+def _read_income_districts():
+    """Median monthly gross wage per district (Kreis) by place of residence, BA sheet 9.1."""
+    table = pd.read_excel(INCOME_KREIS_PATH, sheet_name=INCOME_KREIS_SHEET, header=None, dtype={0: str})
+    # Column A: region key (5 digits = district), column J: median in EUR
+    table = table[table[0].str.fullmatch(r"\d{5}", na=False)]
+    return pd.to_numeric(table.set_index(0)[9], errors="coerce").rename("median_eur")
+
+
 def save_income_population_grid():
-    # Each 500 m cell takes the median wage of its 1 km parent (or of its 5 km parent where the 1 km value
-    # is not published). The median is an intensive value, so it is assigned, not split. The employee
-    # count is a count, so the 1 km value is split over the 500 m children by their share of residents.
+    # Each 500 m cell takes the median wage of its 1 km parent, else of its 5 km parent, else of its district
+    # (Kreis), wherever the finer value is not published. The median is an intensive value, so it is assigned,
+    # not split. The employee count is a count, so the 1 km value is split over the 500 m children by their
+    # share of residents.
     if INCOME_POP_OUT.exists():
         print(f"{INCOME_POP_OUT} already exists, skipping")
         return
-    if not INCOME_ZIP_PATH.exists():
-        raise FileNotFoundError(f"{INCOME_ZIP_PATH} is missing; download the BA grid data by hand")
+    for path in [INCOME_ZIP_PATH, INCOME_KREIS_PATH]:
+        if not path.exists():
+            raise FileNotFoundError(f"{path} is missing; download the BA data by hand")
     with zipfile.ZipFile(INCOME_ZIP_PATH) as archive:
         grid_1km = _read_income_grid(archive, INCOME_1KM_CSV)
         grid_5km = _read_income_grid(archive, INCOME_5KM_CSV)
+    districts = _read_income_districts()
 
     cells = read_bw_population_cells()
     # All grids are EPSG:3035 and aligned; parent IDs come from the 500 m cell centre
@@ -239,10 +253,17 @@ def save_income_population_grid():
                          + "E" + (cells["x_mp"] // 1000).astype(int).astype(str))
     cells["cell_5km"] = ("5kmN" + (cells["y_mp"] // 5000 * 5).astype(int).astype(str)
                          + "E" + (cells["x_mp"] // 5000 * 5).astype(int).astype(str))
+    # District of each cell centre; the nearest district catches centres on a simplified border
+    kreise = gpd.read_file(OUT_PATH)[["AGS", "geometry"]].to_crs("EPSG:3035")
+    nearest = gpd.sjoin_nearest(cells[["geometry"]].to_crs("EPSG:3035"), kreise, how="left")
+    cells["AGS"] = nearest[~nearest.index.duplicated()]["AGS"]
     median_1km = cells["cell_1km"].map(grid_1km["median_eur"])
     median_5km = cells["cell_5km"].map(grid_5km["median_eur"])
-    cells["median_income"] = median_1km.fillna(median_5km)
-    cells["income_source"] = np.select([median_1km.notna(), median_5km.notna()], ["1km", "5km"], default=None)
+    median_kreis = cells["AGS"].map(districts)
+    cells["median_income"] = median_1km.fillna(median_5km).fillna(median_kreis)
+    cells["income_source"] = np.select(
+        [median_1km.notna(), median_5km.notna(), median_kreis.notna()], ["1km", "5km", "kreis"], default=None
+    )
 
     # Residents of each 1 km parent = sum over its 500 m children in BW
     parent_pop = cells.groupby("cell_1km")["Einwohner"].transform("sum")
@@ -260,7 +281,8 @@ def save_income_population_grid():
     with open(INCOME_POP_OUT, "w", encoding="utf-8") as file:
         json.dump({"columns": columns, "rows": rows}, file)
     counts = cells["income_source"].value_counts()
-    print(f"{len(rows)} {POP_CELL} m cells (median from 1 km: {counts.get('1km', 0)}, from 5 km: {counts.get('5km', 0)}) "
+    print(f"{len(rows)} {POP_CELL} m cells (median from 1 km: {counts.get('1km', 0)}, 5 km: {counts.get('5km', 0)}, "
+          f"district: {counts.get('kreis', 0)}) "
           f"saved to {INCOME_POP_OUT}")
 
 

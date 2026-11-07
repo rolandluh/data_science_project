@@ -28,9 +28,9 @@ Derived features: distance to the nearest charger and kW per area. `Inbetriebnah
 | `bevoelkerung_500m.json` (49,074 cells) | Population per 500 m cell (Zensus 100 m cells summed) |
 | `ev_anteil_5km_bw.geojson` (1,563 cells) | Share of cars with electric drive per 5 km cell (%) |
 | `ev_bevoelkerung_500m_bw.json` (49,074 cells) | Parent 5 km EV share per populated 500 m cell; `ev_index` = residents × share / 100. Each 500 m cell lies fully inside one 5 km cell, so no area split is needed |
-| `einkommen_500m_bw.json` (49,074 cells) | Median monthly gross wage at residence (`median_income`, from the 1 km parent or the 5 km parent where suppressed, see `income_source`), resident employees split by population (`employees`), `wage_sum` = employees × median |
+| `einkommen_500m_bw.json` (49,074 cells) | Median monthly gross wage at residence (`median_income`, from the 1 km parent, else the 5 km parent, else the district, see `income_source`), resident employees split by population (`employees`), `wage_sum` = employees × median |
 
-The BA publishes a median only for cells with at least 500 employees; 0 in the raw file means "not published". 8,800 cells (406k residents) have neither a 1 km nor a 5 km median.
+The BA publishes a median only for cells with at least 500 employees; 0 in the raw file means "not published". 8,800 cells (406k residents) have neither a 1 km nor a 5 km median and take their district median (BA table by place of residence, sheet 9.1 of `entgelt_kreise_wohnort_202512.xlsx`). The district table also confirms the grid covers full-time employees of the core group only: both add up to 21.45 M for Germany.
 
 Cells marked `-` by the KBA (267 in Germany, 7 in BW) have no published value and are stored as no data.
 
