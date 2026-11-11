@@ -10,6 +10,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 from shapely.geometry import box
+from sklearn.neighbors import KDTree
 
 from extract_occupancy import save_daily_occupancy, save_occupancy_workbook
 from extract_traffic import save_traffic_counters
@@ -210,6 +211,100 @@ def save_ev_population_grid():
     with open(EV_POP_OUT, "w", encoding="utf-8") as file:
         json.dump({"columns": columns, "rows": rows}, file)
     print(f"{len(rows)} {POP_CELL} m cells ({cells['ev_share'].notna().sum()} with EV share) saved to {EV_POP_OUT}")
+
+
+GAP_RADIUS_M = 1500  # catchment around each 500 m cell in which demand and charging points are summed
+GAP_OUT = Path("data/processed/nachfrage_luecke_500m_bw.json")
+
+DWELL_URL = "https://www.destatis.de/static/DE/zensus/gitterdaten/Wohnungen_nach_Gebaeudetyp_Groesse.zip"
+DWELL_ZIP_PATH = Path("data/raw/zensus2022_wohnungen_gebaeudetyp.zip")
+DWELL_CSV = "Zensus2022_Wohnung_Gebaeudetyp_Groesse_100m-Gitter.csv"
+# Dwellings in detached, semi-detached and terraced 1- and 2-family houses: usually with a private parking space
+DWELL_HOUSE_COLUMNS = ["FreiEFH", "EFH_DHH", "EFH_Reihenhaus", "Freist_ZFH", "ZFH_DHH", "ZFH_Reihenhaus"]
+DWELL_OTHER_COLUMNS = ["MFH_3bis6Wohnungen", "MFH_7bis12Wohnungen", "MFH_13undmehrWohnungen", "AndererGebaeudetyp"]
+# Share of EV owners in 1- and 2-family houses who charge at home and need no public charger.
+# Calibrated against observed AC station occupancy (MobiData BW history, 3,909 stations; src/sensitivity_home_charging.py):
+# 0.9 is the best fit of the log-occupancy regression at GAP_RADIUS_M; see docs/sensitivity_home_charging_rate.md
+HOME_CHARGING_RATE = 0.9
+
+
+def read_house_shares():
+    """Zensus 2022 dwellings by building type, 100 m cells summed to 500 m: share of dwellings in 1- and 2-family houses."""
+    if not DWELL_ZIP_PATH.exists():
+        urllib.request.urlretrieve(DWELL_URL, DWELL_ZIP_PATH)
+    columns = ["x_mp_100m", "y_mp_100m", *DWELL_HOUSE_COLUMNS, *DWELL_OTHER_COLUMNS]
+    with zipfile.ZipFile(DWELL_ZIP_PATH) as archive:
+        with archive.open(DWELL_CSV) as file:
+            # "–" marks an empty class; cp1252 decodes it, to_numeric turns it into 0
+            cells = pd.read_csv(file, sep=";", encoding="cp1252", usecols=columns, dtype=str)
+    counts = cells[DWELL_HOUSE_COLUMNS + DWELL_OTHER_COLUMNS].apply(pd.to_numeric, errors="coerce").fillna(0)
+    # Same EPSG:3035 grid as the population: each 500 m cell holds exactly 5 x 5 cells of 100 m
+    counts["x_ll"] = cells["x_mp_100m"].astype(int) // POP_CELL * POP_CELL
+    counts["y_ll"] = cells["y_mp_100m"].astype(int) // POP_CELL * POP_CELL
+    counts = counts.groupby(["x_ll", "y_ll"]).sum()
+    houses = counts[DWELL_HOUSE_COLUMNS].sum(axis=1)
+    total = houses + counts[DWELL_OTHER_COLUMNS].sum(axis=1)
+    # The share uses the sum of the classes as total, since published counts are perturbed and may not add up
+    return (houses / total.where(total > 0)).rename("house_share").reset_index()
+
+
+def save_demand_gap_grid():
+    # Floating catchment: around each 500 m cell, the public EV demand within GAP_RADIUS_M is set against the public
+    # charging points (Bundesnetzagentur register) within the same radius. ev_per_point = demand / points,
+    # where no charging point in reach counts as one, so those cells are ranked by their demand alone (points stays 0).
+    # Home-charging correction: ev_public = ev_index x (1 - HOME_CHARGING_RATE x share of dwellings in 1-2-family houses),
+    # since owners with their own driveway or garage mostly charge at home. Cells without dwelling data keep ev_index.
+    # The register extract holds only BW stations, so cells near the state border overstate the gap.
+    if GAP_OUT.exists():
+        print(f"{GAP_OUT} already exists, skipping")
+        return
+    save_chargers()
+    save_ev_population_grid()
+
+    with open(EV_POP_OUT, encoding="utf-8") as file:
+        grid = json.load(file)
+    cells = pd.DataFrame(grid["rows"], columns=grid["columns"])
+    with open(CHARGERS_OUT, encoding="utf-8") as file:
+        register = json.load(file)
+    chargers = pd.DataFrame(register["rows"], columns=register["columns"])
+    points = pd.to_numeric(chargers["Anzahl Ladepunkte"], errors="coerce").fillna(1).to_numpy()
+    kw = pd.to_numeric(chargers["Nennleistung Ladeeinrichtung [kW]"].str.replace(",", "."), errors="coerce").fillna(0)
+
+    # Distances in metres: both point sets go to EPSG:3035
+    def metres(lon, lat):
+        projected = gpd.GeoSeries(gpd.points_from_xy(lon, lat, crs="EPSG:4326")).to_crs("EPSG:3035")
+        return np.column_stack([projected.x, projected.y])
+
+    cell_xy = metres(cells["lon"], cells["lat"])
+    charger_xy = metres(chargers["Längengrad"], chargers["Breitengrad"])
+    kw = kw.to_numpy()
+
+    # The cell centre lies 250 m inside its 500 m cell, so flooring finds the lower-left corner despite rounded lat/lon
+    cells["x_ll"] = (cell_xy[:, 0] // POP_CELL * POP_CELL).astype(int)
+    cells["y_ll"] = (cell_xy[:, 1] // POP_CELL * POP_CELL).astype(int)
+    cells = cells.merge(read_house_shares(), on=["x_ll", "y_ll"], how="left")  # a left merge keeps the row order
+    cells["house_share"] = cells["house_share"].round(3)
+    cells["ev_public"] = (cells["ev_index"] * (1 - HOME_CHARGING_RATE * cells["house_share"].fillna(0))).round(1)
+    ev_public = cells["ev_public"].fillna(0).to_numpy()
+
+    near_cells = KDTree(cell_xy).query_radius(cell_xy, r=GAP_RADIUS_M)
+    near_chargers = KDTree(charger_xy).query_radius(cell_xy, r=GAP_RADIUS_M)
+    cells["demand"] = [ev_public[idx].sum().round(1) for idx in near_cells]
+    cells["stations"] = [len(idx) for idx in near_chargers]
+    cells["points"] = [int(points[idx].sum()) for idx in near_chargers]
+    cells["kw"] = [round(kw[idx].sum()) for idx in near_chargers]
+    cells["ev_per_point"] = (cells["demand"] / cells["points"].clip(lower=1)).round(1)
+
+    # Only cells with demand of their own are shown
+    cells = cells[cells["ev_index"] > 0]
+    columns = ["lat", "lon", "Einwohner", "ev_index", "house_share", "ev_public", "demand", "stations", "points", "kw", "ev_per_point"]
+    rows = cells[columns].astype(object).where(cells[columns].notna(), None).to_dict("split")["data"]
+    with open(GAP_OUT, "w", encoding="utf-8") as file:
+        json.dump(
+            {"columns": columns, "radius_m": GAP_RADIUS_M, "home_charging_rate": HOME_CHARGING_RATE, "rows": rows}, file
+        )
+    no_point = (cells["points"] == 0).sum()
+    print(f"{len(rows)} {POP_CELL} m cells ({no_point} without a charging point within {GAP_RADIUS_M} m) saved to {GAP_OUT}")
 
 
 def _read_income_grid(archive, name):
@@ -596,6 +691,7 @@ def main():
     save_population()
     save_ev_grid()
     save_ev_population_grid()
+    save_demand_gap_grid()
     save_income_population_grid()
     save_parking()
     save_historic_stations()

@@ -160,8 +160,8 @@ map.on("click", (event) => {
 });
 
 // Charging stations
-// Nearby stations merge into numbered circles that split up when zooming in
-const stationLayer = L.markerClusterGroup({ chunkedLoading: true }).addTo(map);
+// Nearby stations merge into numbered circles that split up when zooming in; from zoom 14 every station is shown on its own
+const stationLayer = L.markerClusterGroup({ chunkedLoading: true, disableClusteringAtZoom: 14 }).addTo(map);
 const stations = []; // { record, marker, ac, dc, historic }
 let selectedStation = null;
 // Register stations that also appear in the historic feed (within matchRadiusM)
@@ -295,7 +295,7 @@ fetch("../data/processed/ev_anteil_5km_bw.geojson")
   .catch((error) => console.error("Could not load EV grid", error));
 
 evInput.addEventListener("change", () => {
-  if (evInput.checked) evLayer.addTo(map);
+  if (evInput.checked) evLayer.addTo(map).bringToBack();
   else map.removeLayer(evLayer);
 });
 
@@ -315,8 +315,9 @@ function classLabels(breaks, format = (b) => b) {
 }
 
 // 500 m grid layer from a {columns, rows} JSON file; data is loaded the first time the switch is turned on
+// The grid is sent to the back so that stations and other points stay on top of it
 function gridLayer(input, url, styleRow, popupRow) {
-  const layer = L.layerGroup();
+  const layer = L.featureGroup();
   let loaded = null;
   input.addEventListener("change", () => {
     if (!input.checked) {
@@ -348,7 +349,7 @@ function gridLayer(input, url, styleRow, popupRow) {
         })
         .catch((error) => console.error(`Could not load ${url}`, error));
     loaded.then(() => {
-      if (input.checked) layer.addTo(map);
+      if (input.checked) layer.addTo(map).bringToBack();
     });
   });
   return layer;
@@ -372,6 +373,27 @@ gridLayer(
   })
 );
 
+// 500 m cells: supply gap = public EV demand within 1.5 km / public charging points within 1.5 km (none in reach counts as one)
+// Public demand = EV index minus the owners in 1-2-family houses assumed to charge at home (see save_demand_gap_grid)
+const gapBreaks = [5, 10, 20, 40, 80, 160];
+const gapColors = ["#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#f03b20", "#bd0026"];
+gridLayer(
+  document.getElementById("gap-500m"),
+  "../data/processed/nachfrage_luecke_500m_bw.json",
+  (c) => ({ fillColor: classColor(c.ev_per_point, gapBreaks, gapColors) }),
+  (c) => ({
+    "Residents (500 m)": c.Einwohner,
+    "EV index of this cell": c.ev_index,
+    "Dwellings in 1–2-family houses": c.house_share == null ? "no data" : `${Math.round(c.house_share * 100)} %`,
+    "Public EV demand of this cell (no home charging)": c.ev_public,
+    "Public EV demand within 1.5 km": c.demand,
+    "Charging stations within 1.5 km": c.stations,
+    "Charging points within 1.5 km": c.points,
+    "Charging power within 1.5 km": `${c.kw.toLocaleString("de-DE")} kW`,
+    "Public EV demand per charging point": c.points ? c.ev_per_point : `${c.ev_per_point} (no point in reach, counted as one)`,
+  })
+);
+
 // 500 m cells: median monthly gross wage at residence (BA), from the 1 km parent, else the 5 km parent, else the district
 const incomeBreaks = [3800, 4100, 4300, 4500, 4700, 5000, 5500];
 const incomeColors = ["#faf5ff", "#f3e8ff", "#e9d5ff", "#d8b4fe", "#c084fc", "#a855f7", "#7e22ce", "#4c1d95"];
@@ -391,6 +413,62 @@ gridLayer(
   })
 );
 
+// OSM points (Geofabrik extract), one switch per category; a file is loaded the first time one of its switches is turned on
+const geojsonFiles = {}; // url -> Promise of the parsed file, shared by the switches that use it
+function loadGeoJSON(url) {
+  geojsonFiles[url] = geojsonFiles[url] || fetch(url).then((response) => response.json());
+  return geojsonFiles[url];
+}
+
+function osmPointLayer(input, url, filter, color) {
+  const layer = L.geoJSON(null, {
+    filter,
+    pointToLayer: (feature, latlng) =>
+      L.circleMarker(latlng, {
+        radius: 3,
+        color,
+        fillColor: color,
+        fillOpacity: 0.9,
+        weight: 1,
+        bubblingMouseEvents: false,
+      }),
+    onEachFeature: (feature, marker) => marker.bindPopup(() => popupHtml(feature.properties)),
+  });
+  let loaded = null;
+  input.addEventListener("change", () => {
+    if (!input.checked) {
+      map.removeLayer(layer);
+      return;
+    }
+    loaded =
+      loaded ||
+      loadGeoJSON(url)
+        .then((data) => layer.addData(data))
+        .catch((error) => console.error(`Could not load ${url}`, error));
+    loaded.then(() => {
+      if (input.checked) layer.addTo(map);
+    });
+  });
+}
+
+const poiUrl = "../data/processed/poi_osm_bw.geojson";
+const roadPointUrl = "../data/processed/strassenpunkte_osm_bw.geojson";
+const substationUrl = "../data/processed/umspannwerke_osm_bw.geojson";
+const hasValue = (key, values) => (feature) => values.includes(feature.properties[key]);
+// [switch id, file, feature filter, colour, legend label]
+const osmPointLayers = [
+  ["poi-office", poiUrl, hasValue("category", ["office"]), "#4f46e5", "Office (OSM)"],
+  ["poi-industrial", poiUrl, hasValue("category", ["industrial"]), "#78716c", "Industrial site (OSM)"],
+  ["poi-supermarket", poiUrl, hasValue("category", ["supermarket"]), "#c2410c", "Supermarket (OSM)"],
+  ["poi-retail", poiUrl, hasValue("category", ["retail"]), "#db2777", "Retail (OSM)"],
+  ["poi-university", poiUrl, hasValue("category", ["university"]), "#0284c7", "University (OSM)"],
+  ["poi-hospital", poiUrl, hasValue("category", ["hospital"]), "#dc2626", "Hospital (OSM)"],
+  ["road-junction", roadPointUrl, hasValue("kind", ["junction"]), "#475569", "Motorway junction (OSM)"],
+  ["road-rest", roadPointUrl, hasValue("kind", ["rest_area", "services"]), "#854d0e", "Rest area / services (OSM)"],
+  ["substations", substationUrl, () => true, "#ca8a04", "Substation (OSM)"],
+];
+osmPointLayers.forEach(([id, url, filter, color]) => osmPointLayer(document.getElementById(id), url, filter, color));
+
 // Legend, bottom-left: shows only the entries whose switch is on
 const legend = L.control({ position: "bottomleft" });
 legend.onAdd = () => L.DomUtil.create("div", "legend");
@@ -404,6 +482,7 @@ const symbolEntries = [
   [["show-historic"], "dot", "#e11d48", "Charging station (historic only, 18 Oct 2026)"],
   [["parking"], "dot", "#22c55e", "Parking spot (MobiData + OSM)"],
   [["traffic-counters"], "dot", "#0d9488", "Traffic counting site"],
+  ...osmPointLayers.map(([id, , , color, label]) => [[id], "dot", color, label]),
   [["show-borders"], "box", "#000000", "State border"],
   [["show-area"], "box", "#2563eb", "Study area / district"],
   [["population"], "gradient", "linear-gradient(to right, rgba(37,99,235,0.6), rgba(245,158,11,0.6), rgba(220,38,38,0.8))", "Population heatmap (zoom 9+)"],
@@ -411,6 +490,7 @@ const symbolEntries = [
 const scaleEntries = [
   ["ev", "EV share of cars, 5 km grid (%)", classLabels(evBreaks), evColors, "no data"],
   ["ev-500m", "EV index, 500 m grid (residents × share)", classLabels(evPopBreaks), evPopColors, null],
+  ["gap-500m", "Supply gap: public EV demand per charging point (1.5 km)", classLabels(gapBreaks), gapColors, null],
   ["income-500m", "Median gross wage per month, 500 m grid", classLabels(incomeBreaks, euro), incomeColors, null],
 ];
 const swatch = (shape, color, label) =>
@@ -445,6 +525,18 @@ legendInput.addEventListener("change", applyLegendVisibility);
 // Any switch in the side panel can change which entries are shown
 document.querySelector("aside").addEventListener("change", renderLegend);
 
+// Demand view: the 500 m EV index grid (EV share × residents) with the charging stations on top.
+// Turns the underlying switches on or off together, so they can still be changed one by one afterwards.
+const demandInput = byId("demand");
+demandInput.addEventListener("change", () => {
+  ["ev-500m", "show-register", "show-matched"].forEach((id) => {
+    const input = byId(id);
+    if (input.checked === demandInput.checked) return;
+    input.checked = demandInput.checked;
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+});
+
 // Parking sites in Baden-Württemberg (OSM joined with MobiData BW within 10 m, plus unmatched MobiData), shown as green dots
 const parkingInput = document.getElementById("parking");
 const parkingLayer = L.geoJSON(null, {
@@ -458,7 +550,7 @@ const parkingLayer = L.geoJSON(null, {
       bubblingMouseEvents: false,
     }),
   onEachFeature: (feature, layer) => layer.bindPopup(() => popupHtml(feature.properties)),
-}).addTo(map);
+});
 
 fetch("../data/processed/parkplaetze_kombiniert_bw.geojson")
   .then((response) => response.json())
@@ -552,7 +644,7 @@ const historicLayer = L.geoJSON(null, {
       bubblingMouseEvents: false,
     }),
   onEachFeature: (feature, layer) => layer.bindPopup(() => popupHtml(feature.properties)),
-}).addTo(map);
+});
 
 const historicInput = document.getElementById("show-historic");
 historicInput.addEventListener("change", () => {
@@ -610,11 +702,39 @@ Promise.all([stationsLoaded, fetch("../data/processed/historie_bw.geojson").then
 const bordersLayer = L.geoJSON(null, {
   interactive: false,
   style: { color: "#000000", weight: 1.5, fill: false },
-}).addTo(map);
+});
+
+// Grey veil over everything outside Baden-Württemberg, in its own pane between the tiles and the data layers
+map.createPane("mask");
+map.getPane("mask").style.zIndex = 250;
+map.getPane("mask").style.pointerEvents = "none";
+
+function outsideMask(feature) {
+  const world = [
+    [85, -180],
+    [85, 180],
+    [-85, 180],
+    [-85, -180],
+  ];
+  const parts = feature.geometry.type === "Polygon" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
+  // The outer ring of every BW part becomes a hole in the world polygon
+  const holes = parts.map((polygon) => polygon[0].map(([lon, lat]) => [lat, lon]));
+  return L.polygon([world, ...holes], {
+    pane: "mask",
+    interactive: false,
+    stroke: false,
+    fillColor: "#9ca3af",
+    fillOpacity: 0.55,
+  });
+}
 
 fetch("../data/processed/laender.geojson")
   .then((response) => response.json())
-  .then((data) => bordersLayer.addData(data))
+  .then((data) => {
+    bordersLayer.addData(data);
+    const bw = data.features.find((feature) => feature.properties.AGS === "08");
+    if (bw) outsideMask(bw).addTo(map);
+  })
   .catch((error) => console.error("Could not load state borders", error));
 
 const bordersInput = document.getElementById("show-borders");

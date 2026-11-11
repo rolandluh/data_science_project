@@ -40,12 +40,26 @@
   </div>
   <aside id="layers">
     <h2>Layers</h2>
+    <h3>Demand</h3>
+    <label class="switch-row" title="500 m grid of EV share × residents, with the charging stations on top"><span>Demand grid + charging stations</span><span class="switch"><input id="demand" type="checkbox"><span class="knob"></span></span></label>
+    <label class="switch-row" title="Public EV demand (without home charging in 1–2-family houses) within 1.5 km per public charging point within 1.5 km; high = undersupplied"><span>Supply gap (public EV demand per charging point)</span><span class="switch"><input id="gap-500m" type="checkbox"><span class="knob"></span></span></label>
     <h3>Charging stations</h3>
-    <label class="switch-row"><span>Register only</span><span class="switch"><input id="show-register" type="checkbox" checked><span class="knob"></span></span></label>
-    <label class="switch-row"><span>Register + historic</span><span class="switch"><input id="show-matched" type="checkbox" checked><span class="knob"></span></span></label>
-    <label class="switch-row"><span>Historic only</span><span class="switch"><input id="show-historic" type="checkbox" checked><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Register only</span><span class="switch"><input id="show-register" type="checkbox"><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Register + historic</span><span class="switch"><input id="show-matched" type="checkbox"><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Historic only</span><span class="switch"><input id="show-historic" type="checkbox"><span class="knob"></span></span></label>
     <h3>Parking</h3>
-    <label class="switch-row"><span>Parking (MobiData + OSM)</span><span class="switch"><input id="parking" type="checkbox" checked><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Parking (MobiData + OSM)</span><span class="switch"><input id="parking" type="checkbox"><span class="knob"></span></span></label>
+    <h3>Points of interest (OSM)</h3>
+    <label class="switch-row"><span>Offices</span><span class="switch"><input id="poi-office" type="checkbox"><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Industrial sites</span><span class="switch"><input id="poi-industrial" type="checkbox"><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Supermarkets</span><span class="switch"><input id="poi-supermarket" type="checkbox"><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Retail</span><span class="switch"><input id="poi-retail" type="checkbox"><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Universities</span><span class="switch"><input id="poi-university" type="checkbox"><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Hospitals</span><span class="switch"><input id="poi-hospital" type="checkbox"><span class="knob"></span></span></label>
+    <h3>Infrastructure (OSM)</h3>
+    <label class="switch-row"><span>Motorway junctions</span><span class="switch"><input id="road-junction" type="checkbox"><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Rest areas + services</span><span class="switch"><input id="road-rest" type="checkbox"><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Substations</span><span class="switch"><input id="substations" type="checkbox"><span class="knob"></span></span></label>
     <h3>Context</h3>
     <label class="switch-row"><span>Population heatmap</span><span class="switch"><input id="population" type="checkbox"><span class="knob"></span></span></label>
     <label class="switch-row"><span>EV share (5 km grid)</span><span class="switch"><input id="ev" type="checkbox"><span class="knob"></span></span></label>
@@ -53,9 +67,9 @@
     <label class="switch-row"><span>Median income (500 m)</span><span class="switch"><input id="income-500m" type="checkbox"><span class="knob"></span></span></label>
     <label class="switch-row"><span>Traffic counting sites</span><span class="switch"><input id="traffic-counters" type="checkbox"><span class="knob"></span></span></label>
     <h3>Map</h3>
-    <label class="switch-row"><span>Study area</span><span class="switch"><input id="show-area" type="checkbox" checked><span class="knob"></span></span></label>
-    <label class="switch-row"><span>State borders</span><span class="switch"><input id="show-borders" type="checkbox" checked><span class="knob"></span></span></label>
-    <label class="switch-row"><span>Legend</span><span class="switch"><input id="show-legend" type="checkbox" checked><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Study area</span><span class="switch"><input id="show-area" type="checkbox"><span class="knob"></span></span></label>
+    <label class="switch-row"><span>State borders</span><span class="switch"><input id="show-borders" type="checkbox"><span class="knob"></span></span></label>
+    <label class="switch-row"><span>Legend</span><span class="switch"><input id="show-legend" type="checkbox"><span class="knob"></span></span></label>
   </aside>
   <div id="zoom-slider">
     <input id="zoom" type="range" min="6" max="19" step="1">

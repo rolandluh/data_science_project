@@ -32,6 +32,7 @@ Each `save_*()` function skips if its output file already exists. Delete the out
 | `save_population()` | `bevoelkerung_500m.json` | Zensus 2022 (100 m cells summed to 500 m) |
 | `save_ev_grid()` | `ev_anteil_5km_bw.geojson` | KBA 5 km grid (EV share, raw CSV added by hand) |
 | `save_ev_population_grid()` | `ev_bevoelkerung_500m_bw.json` | 5 km EV share × Zensus 500 m residents (population-weighted) |
+| `save_demand_gap_grid()` | `nachfrage_luecke_500m_bw.json` | Supply gap: public EV demand within 1.5 km / register charging points within 1.5 km (no point counts as one). Public demand = EV index × (1 − 0.9 × share of dwellings in 1–2-family houses), Zensus 2022 dwellings by building type (downloaded). Rate 0.9 calibrated against station occupancy: `src/sensitivity_home_charging.py`, `docs/sensitivity_home_charging_rate.md` |
 | `save_income_population_grid()` | `einkommen_500m_bw.json` | BA median wage (1 km → 5 km → district fallback) + employees split by residents (`Grunddaten-regionale-Entgelte.zip` and `entgelt_kreise_wohnort_202512.xlsx`, added by hand) |
 | `save_parking()` | `parkplaetze_bw.geojson` | MobiData BW (off-street + street) |
 | `save_osm_parking()` | `parkplaetze_osm_bw.geojson` | OpenStreetMap (Overpass API, `amenity=parking`) |
