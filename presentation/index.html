@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>EV Charging Site Planner – Interim Presentation</title>
+<title>Electric Vehicle Charging Site Planner – Interim Presentation</title>
 <style>
   :root {
     --bg: #dde7f6; --panel: #f3f6fb; --panel2: #e3f1ee; --text: #14213d; --muted: #3f4a66;
@@ -28,9 +28,9 @@
   .kicker { color: var(--accent); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; font-size: .8rem; }
   .speaker { color: var(--muted); font-size: .8rem; position: absolute; top: 3vh; right: 4vw; }
   h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 1.05; }
-  h2 { font-size: clamp(1.8rem, 3.6vw, 2.9rem); line-height: 1.12; max-width: 22ch; }
-  h2.wide { max-width: 32ch; }
-  .lead { font-size: clamp(1.1rem, 1.8vw, 1.5rem); color: var(--muted); max-width: 42ch; }
+  h2 { font-size: clamp(1.7rem, 3.2vw, 2.7rem); line-height: 1.15; max-width: none; text-wrap: balance; }
+  h2.wide { max-width: none; }
+  .lead { font-size: clamp(1.1rem, 1.8vw, 1.5rem); color: var(--muted); max-width: 70ch; }
   .grid { display: grid; gap: 20px; }
   .g2 { grid-template-columns: repeat(2, 1fr); } .g3 { grid-template-columns: repeat(3, 1fr); } .g4 { grid-template-columns: repeat(4, 1fr); }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px 24px; }
@@ -51,7 +51,7 @@
   .node { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: .92rem; text-align: center; }
   .node.acc { border-color: var(--accent); color: var(--accent); font-weight: 700; }
   .node.center { flex: 1; display: flex; align-items: center; justify-content: center; background: var(--panel2); border-color: var(--accent); font-weight: 700; }
-  .flow .ar { align-self: center; color: var(--accent); font-size: 1.8rem; }
+  .flow .ar { align-self: start; margin-top: 1rem; color: var(--accent); font-size: 1.8rem; }
   .note { font-size: .74rem; color: var(--warn); margin-top: -4px; text-align: center; }
   /* lena */
   .pain { display: grid; gap: 10px; }
@@ -72,6 +72,14 @@
   nav.dots a.on { background: var(--accent); transform: scale(1.4); }
   .bar { position: fixed; left: 0; top: 0; height: 3px; background: var(--accent); width: 0; z-index: 6; }
   .hint { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); color: var(--muted); font-size: .8rem; z-index: 5; }
+  @media (max-height: 800px) {
+    section.slide { padding-top: 4vh; padding-bottom: 5vh; gap: 2vh; }
+    h2 { font-size: min(3.2vw, 5.2vh); }
+    .lead { font-size: min(1.8vw, 2.9vh); }
+    .pain { gap: 6px; } .pain div { padding: 6px 14px; font-size: .95rem; }
+    .card { padding: 14px 18px; } .node { padding: 5px 10px; font-size: .85rem; }
+    .flow .col { gap: 5px; } .steps div { padding-top: 8px; padding-bottom: 8px; }
+  }
   @media (max-width: 900px) {
     .g2, .g3, .g4 { grid-template-columns: 1fr; }
     .flow { grid-template-columns: 1fr; } .flow .ar { transform: rotate(90deg); }
@@ -87,7 +95,7 @@
 <!-- 1 -->
 <section class="slide" id="s1">
   <span class="kicker">DS500 · Interim presentation</span>
-  <h1>Where should the next<br>charging station go?</h1>
+  <h1>Where should the next charging station go?</h1>
   <p class="lead">Open data + a demand model + budget-constrained optimization, shown on a web map for Baden-Württemberg.</p>
   <p class="tag" style="align-self:flex-start">Arun · Marko · Roland</p>
 </section>
@@ -100,8 +108,8 @@
   <div class="grid g2">
     <div class="card hl">
       <span class="tag ok">Primary</span>
-      <h3 style="margin-top:10px">Charge point operators &amp; investors in BW</h3>
-      <p>CPOs, utilities, energy companies planning new sites.</p>
+      <h3 style="margin-top:10px">Charge point operators &amp; investors in Baden-Württemberg</h3>
+      <p>Charge point operators, utilities, energy companies planning new sites.</p>
       <p style="margin-top:8px"><b>Limits:</b> budget, area</p>
     </div>
     <div class="card">
@@ -122,7 +130,7 @@
 <section class="slide" id="s3">
   <span class="speaker">Roland</span>
   <span class="kicker">2 · How will they use it?</span>
-  <h2 class="wide">Meet Lena, CPO expansion manager at EnBW, Karlsruhe</h2>
+  <h2 class="wide">Meet Lena, charge point operator expansion manager at EnBW, Karlsruhe</h2>
   <p class="lead">Her team has a budget. She must pick the best sites and defend the choice to her supervisors.</p>
   <div class="grid g2">
     <div>
@@ -138,7 +146,7 @@
     <div>
       <h3 style="margin-bottom:10px">She needs …</h3>
       <div class="pain need">
-        <div>a demand map, with EV density per area</div>
+        <div>a demand map, with electric vehicle density per area</div>
         <div>demand vs. existing supply: the gap</div>
         <div>ranked candidate sites</div>
         <div>number and type of chargers per site</div>
@@ -165,16 +173,18 @@
 <!-- 5 -->
 <section class="slide" id="s5">
   <span class="kicker">3 · What are we building?</span>
-  <h2 class="wide">A pipeline, an ML model and a web map: open data in, site recommendation out</h2>
+  <h2 class="wide">A pipeline, a machine learning model and a web map: open data in, site recommendation out</h2>
   <div class="flow">
     <div class="col">
       <h4>Sources</h4>
       <div class="node">Bundesnetzagentur charger register</div>
-      <div class="node acc">MobiData BW: live status + history</div>
+      <div class="node acc">MobiData Baden-Württemberg: live status + history</div>
       <div class="note">occupancy covers ~1/3 of stations</div>
-      <div class="node">Zensus 2022 · KBA EV share · BA income</div>
-      <div class="node">OpenStreetMap: parking, POIs, roads, substations</div>
-      <div class="node">BKG boundaries</div>
+      <div class="node">Zensus 2022: population</div>
+      <div class="node">Federal Motor Transport Authority: electric vehicle share</div>
+      <div class="node">Federal Employment Agency: income</div>
+      <div class="node">OpenStreetMap: parking, points of interest, roads, substations</div>
+      <div class="node">Federal Agency for Cartography and Geodesy: boundaries</div>
     </div>
     <div class="ar">→</div>
     <div class="col"><h4>Pipeline</h4><div class="node center">Automated download, cleaning &amp; validation</div></div>
@@ -201,22 +211,22 @@
   <span class="kicker">3 · The data</span>
   <h2>What we have, and where it is thin</h2>
   <div class="grid g4">
-    <div class="card"><div class="big">18,863</div><p>charging stations in BW (register)</p></div>
-    <div class="card"><div class="big">~140k</div><p>parking sites as candidates (OSM + MobiData)</p></div>
+    <div class="card"><div class="big">18,863</div><p>charging stations in Baden-Württemberg (register)</p></div>
+    <div class="card"><div class="big">~140k</div><p>parking sites as candidates (OpenStreetMap + MobiData)</p></div>
     <div class="card"><div class="big">500 m</div><p>demand grid from Zensus 2022</p></div>
     <div class="card"><div class="big">~1/3</div><p>of stations with observed usage</p></div>
   </div>
   <div class="grid g2">
     <div class="card"><h3>Also in the data</h3><ul>
-      <li>EV share (KBA), income (BA), land use</li>
+      <li>Electric vehicle share, income, land use</li>
       <li>Supermarkets, hospitals, universities</li>
       <li>Substations as grid-connection proxy</li>
       <li>Motorways and junctions</li></ul></div>
     <div class="card"><h3 style="color:var(--warn)">Limits</h3><ul>
       <li>Usage data is biased toward larger networks</li>
       <li>Usage exists only where stations already stand</li>
-      <li>EV share and income are coarse (1–5 km), spread over 500 m</li>
-      <li>Private vs. public parking hard to tell apart in OSM</li>
+      <li>Electric vehicle share and income are coarse (1–5 km), spread over 500 m</li>
+      <li>Private vs. public parking hard to tell apart in OpenStreetMap</li>
       <li>No revenue data: returns rest on stated assumptions</li></ul></div>
   </div>
 </section>
@@ -233,7 +243,7 @@
   </div>
   <div class="card">
     <h3>Features</h3>
-    <p>Population · EV share · home-charging gap · points of interest · road class · traffic · distance to existing stations</p>
+    <p>Population · electric vehicle share · home-charging gap · points of interest · road class · traffic · distance to existing stations</p>
   </div>
 </section>
 
@@ -310,7 +320,7 @@
     <span class="tag">Try: Supply gap layer · click a 500 m cell · double-click a point for Street View</span>
     <a href="../app/index.html" target="_blank" rel="noopener">Open full screen ↗</a>
   </div>
-  <iframe id="app" title="EV charging map" data-src="../app/index.html" allow="fullscreen; geolocation"></iframe>
+  <iframe id="app" title="Electric vehicle charging map" data-src="../app/index.html" allow="fullscreen; geolocation"></iframe>
 </section>
 
 <script>
