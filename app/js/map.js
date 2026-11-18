@@ -8,7 +8,9 @@ export const germany = L.latLngBounds([47.2, 5.8], [55.1, 15.1]);
 export const badenWuerttemberg = L.latLngBounds([47.5, 7.5], [49.8, 10.5]);
 
 export const map = L.map("map", { preferCanvas: true, zoomControl: false });
-map.fitBounds(badenWuerttemberg);
+// Default view: centre of Baden-Württemberg at zoom level 8
+const home = { center: badenWuerttemberg.getCenter(), zoom: 8 };
+map.setView(home.center, home.zoom);
 map.setMinZoom(map.getBoundsZoom(germany));
 
 L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -24,7 +26,7 @@ resetControl.onAdd = () => {
   L.DomEvent.disableClickPropagation(div);
   div.querySelector("a").addEventListener("click", (event) => {
     event.preventDefault();
-    map.fitBounds(badenWuerttemberg);
+    map.setView(home.center, home.zoom);
   });
   return div;
 };

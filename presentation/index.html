@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EV Charging Site Planner – Interim Presentation</title>
+<style>
+  :root {
+    --bg: #dde7f6; --panel: #f3f6fb; --panel2: #e3f1ee; --text: #14213d; --muted: #3f4a66;
+    --accent: #0b7a6b; --accent2: #0369a1; --pop: #d9480f; --warn: #b45309; --bad: #be123c; --line: #cdd6e6;
+  }
+  .card, .node, .chain span.box, .steps div, .pain div { box-shadow: 0 2px 0 rgba(20, 33, 61, .10), 0 6px 16px rgba(20, 33, 61, .06); border-color: #bcc8de; }
+  section.slide { background: #dde7f6; }
+  .card, .node, .steps div, .pain div, .chain span.box { background: #fff; }
+  .kicker { color: var(--pop) !important; }
+  h1, h2 { color: var(--text); }
+  h1 { border-left: 10px solid var(--pop); padding-left: 24px; }
+  .card.hl { background: #e3f1ee; }
+  .tag.ok { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .tag.todo { background: #fdebd3; }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font: 18px/1.45 system-ui, "Segoe UI", sans-serif; }
+  section.slide {
+    min-height: 100vh; scroll-snap-align: start; padding: 6vh 7vw 8vh;
+    display: flex; flex-direction: column; justify-content: center; gap: 3vh; position: relative;
+  }
+  .kicker { color: var(--accent); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; font-size: .8rem; }
+  .speaker { color: var(--muted); font-size: .8rem; position: absolute; top: 3vh; right: 4vw; }
+  h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 1.05; }
+  h2 { font-size: clamp(1.8rem, 3.6vw, 2.9rem); line-height: 1.12; max-width: 22ch; }
+  h2.wide { max-width: 32ch; }
+  .lead { font-size: clamp(1.1rem, 1.8vw, 1.5rem); color: var(--muted); max-width: 42ch; }
+  .grid { display: grid; gap: 20px; }
+  .g2 { grid-template-columns: repeat(2, 1fr); } .g3 { grid-template-columns: repeat(3, 1fr); } .g4 { grid-template-columns: repeat(4, 1fr); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px 24px; }
+  .card h3 { font-size: 1.15rem; margin-bottom: 8px; }
+  .card p, .card li { color: var(--muted); font-size: 1rem; }
+  .card ul { padding-left: 1.1em; display: grid; gap: 4px; }
+  .card.hl { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .big { font-size: clamp(2rem, 4.5vw, 3.6rem); font-weight: 800; color: var(--accent); line-height: 1; }
+  .tag { display: inline-block; font-size: .78rem; padding: 3px 10px; border-radius: 99px; background: var(--panel2); color: var(--muted); border: 1px solid var(--line); }
+  .tag.ok { color: var(--accent); border-color: var(--accent); } .tag.todo { color: var(--warn); border-color: var(--warn); }
+  .chain { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: clamp(1.1rem, 2.2vw, 1.8rem); font-weight: 700; }
+  .chain span.box { background: var(--panel); border: 1px solid var(--line); padding: 14px 22px; border-radius: 14px; }
+  .chain .arrow { color: var(--accent); }
+  /* pipeline diagram */
+  .flow { display: grid; grid-template-columns: 1.25fr auto 1fr auto 1fr auto 1fr; align-items: stretch; gap: 14px; }
+  .col { display: flex; flex-direction: column; gap: 8px; }
+  .col h4 { font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); text-align: center; }
+  .node { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: .92rem; text-align: center; }
+  .node.acc { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+  .node.center { flex: 1; display: flex; align-items: center; justify-content: center; background: var(--panel2); border-color: var(--accent); font-weight: 700; }
+  .flow .ar { align-self: center; color: var(--accent); font-size: 1.8rem; }
+  .note { font-size: .74rem; color: var(--warn); margin-top: -4px; text-align: center; }
+  /* lena */
+  .pain { display: grid; gap: 10px; }
+  .pain div { background: var(--panel); border-left: 4px solid var(--bad); padding: 10px 16px; border-radius: 8px; }
+  .need div { border-left-color: var(--accent); }
+  .steps { display: grid; gap: 12px; counter-reset: s; }
+  .steps div { counter-increment: s; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 18px 12px 56px; position: relative; }
+  .steps div::before { content: counter(s); position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 800; display: grid; place-items: center; }
+  /* demo */
+  section.demo { padding: 0; }
+  .demo-bar { display: flex; align-items: center; gap: 16px; padding: 12px 24px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .demo-bar a { color: var(--accent2); margin-left: auto; font-size: .9rem; }
+  section.demo iframe { flex: 1; width: 100%; min-height: calc(100vh - 56px); border: 0; background: #fff; }
+  section.demo { justify-content: flex-start; gap: 0; }
+  /* nav */
+  nav.dots { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); display: grid; gap: 9px; z-index: 5; }
+  nav.dots a { width: 10px; height: 10px; border-radius: 50%; background: var(--line); display: block; }
+  nav.dots a.on { background: var(--accent); transform: scale(1.4); }
+  .bar { position: fixed; left: 0; top: 0; height: 3px; background: var(--accent); width: 0; z-index: 6; }
+  .hint { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); color: var(--muted); font-size: .8rem; z-index: 5; }
+  @media (max-width: 900px) {
+    .g2, .g3, .g4 { grid-template-columns: 1fr; }
+    .flow { grid-template-columns: 1fr; } .flow .ar { transform: rotate(90deg); }
+    nav.dots { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="bar" id="bar"></div>
+<nav class="dots" id="dots"></nav>
+<div class="hint">↓ / Space / scroll</div>
+
+<!-- 1 -->
+<section class="slide" id="s1">
+  <span class="kicker">DS500 · Interim presentation</span>
+  <h1>Where should the next<br>charging station go?</h1>
+  <p class="lead">Open data + a demand model + budget-constrained optimization, shown on a web map for Baden-Württemberg.</p>
+  <p class="tag" style="align-self:flex-start">Arun · Marko · Roland</p>
+</section>
+
+<!-- 2 -->
+<section class="slide" id="s2">
+  <span class="speaker">Arun</span>
+  <span class="kicker">1 · Who is the user?</span>
+  <h2>Operators and investors with a limited budget</h2>
+  <div class="grid g2">
+    <div class="card hl">
+      <span class="tag ok">Primary</span>
+      <h3 style="margin-top:10px">Charge point operators &amp; investors in BW</h3>
+      <p>CPOs, utilities, energy companies planning new sites.</p>
+      <p style="margin-top:8px"><b>Limits:</b> budget, area</p>
+    </div>
+    <div class="card">
+      <span class="tag">Secondary</span>
+      <h3 style="margin-top:10px">Municipalities</h3>
+      <p>Need: fair access to charging for residents.</p>
+    </div>
+  </div>
+  <div class="chain">
+    <span class="box">Profit</span><span class="arrow">→</span>
+    <span class="box">Usage</span><span class="arrow">→</span>
+    <span class="box" style="border-color:var(--accent);color:var(--accent)">Demand</span>
+  </div>
+  <p class="lead">Maximizing profit comes down to finding where demand is.</p>
+</section>
+
+<!-- 3 -->
+<section class="slide" id="s3">
+  <span class="speaker">Roland</span>
+  <span class="kicker">2 · How will they use it?</span>
+  <h2 class="wide">Meet Lena, CPO expansion manager at EnBW, Karlsruhe</h2>
+  <p class="lead">Her team has a budget. She must pick the best sites and defend the choice to her supervisors.</p>
+  <div class="grid g2">
+    <div>
+      <h3 style="margin-bottom:10px">Today she cannot …</h3>
+      <div class="pain">
+        <div>see where charging demand is high</div>
+        <div>see which stations are over- or underused</div>
+        <div>find candidate sites without checking parking lots by hand</div>
+        <div>decide how many and which type of chargers to build</div>
+        <div>estimate returns for each recommendation</div>
+      </div>
+    </div>
+    <div>
+      <h3 style="margin-bottom:10px">She needs …</h3>
+      <div class="pain need">
+        <div>a demand map, with EV density per area</div>
+        <div>demand vs. existing supply: the gap</div>
+        <div>ranked candidate sites</div>
+        <div>number and type of chargers per site</div>
+        <div>the assumptions behind every number</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="slide" id="s4">
+  <span class="speaker">Roland</span>
+  <span class="kicker">2 · How will they use it?</span>
+  <h2>Her workflow in the app</h2>
+  <div class="steps" style="max-width:760px">
+    <div><b>Choose an area:</b> municipality, district, or radius around a point</div>
+    <div><b>Set a budget</b></div>
+    <div><b>Get recommended sites</b> from demand, access, building availability and existing supply</div>
+    <div><b>Get the exact number and type</b> of chargers per site</div>
+    <div><b>See the estimates</b> behind every result</div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="slide" id="s5">
+  <span class="kicker">3 · What are we building?</span>
+  <h2 class="wide">A pipeline, an ML model and a web map: open data in, site recommendation out</h2>
+  <div class="flow">
+    <div class="col">
+      <h4>Sources</h4>
+      <div class="node">Bundesnetzagentur charger register</div>
+      <div class="node acc">MobiData BW: live status + history</div>
+      <div class="note">occupancy covers ~1/3 of stations</div>
+      <div class="node">Zensus 2022 · KBA EV share · BA income</div>
+      <div class="node">OpenStreetMap: parking, POIs, roads, substations</div>
+      <div class="node">BKG boundaries</div>
+    </div>
+    <div class="ar">→</div>
+    <div class="col"><h4>Pipeline</h4><div class="node center">Automated download, cleaning &amp; validation</div></div>
+    <div class="ar">→</div>
+    <div class="col">
+      <h4>Prepared layers</h4>
+      <div class="node">500 m demand grid</div>
+      <div class="node">Existing supply</div>
+      <div class="node">Observed occupancy per station</div>
+      <div class="node">Candidate sites</div>
+    </div>
+    <div class="ar">→</div>
+    <div class="col">
+      <h4>Output</h4>
+      <div class="node acc">Demand gap</div>
+      <div class="node acc">Ranked sites</div>
+      <div class="node acc">Web map</div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="slide" id="s6">
+  <span class="kicker">3 · The data</span>
+  <h2>What we have, and where it is thin</h2>
+  <div class="grid g4">
+    <div class="card"><div class="big">18,863</div><p>charging stations in BW (register)</p></div>
+    <div class="card"><div class="big">~140k</div><p>parking sites as candidates (OSM + MobiData)</p></div>
+    <div class="card"><div class="big">500 m</div><p>demand grid from Zensus 2022</p></div>
+    <div class="card"><div class="big">~1/3</div><p>of stations with observed usage</p></div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><h3>Also in the data</h3><ul>
+      <li>EV share (KBA), income (BA), land use</li>
+      <li>Supermarkets, hospitals, universities</li>
+      <li>Substations as grid-connection proxy</li>
+      <li>Motorways and junctions</li></ul></div>
+    <div class="card"><h3 style="color:var(--warn)">Limits</h3><ul>
+      <li>Usage data is biased toward larger networks</li>
+      <li>Usage exists only where stations already stand</li>
+      <li>EV share and income are coarse (1–5 km), spread over 500 m</li>
+      <li>Private vs. public parking hard to tell apart in OSM</li>
+      <li>No revenue data: returns rest on stated assumptions</li></ul></div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section class="slide" id="s7">
+  <span class="speaker">Marko</span>
+  <span class="kicker">Lena: “Where is demand?”</span>
+  <h2 class="wide">Random Forest predicts “top 20 % demand” areas</h2>
+  <div class="grid g3">
+    <div class="card"><h3>Trained on observed occupancy</h3><p>Following Weekx et al. (2025).</p></div>
+    <div class="card"><h3>Discrete, not exact</h3><p>Top-20 % class suits small, biased data.</p></div>
+    <div class="card"><h3>Retrained regularly</h3><p>Predictions hold only about 1–2 years.</p></div>
+  </div>
+  <div class="card">
+    <h3>Features</h3>
+    <p>Population · EV share · home-charging gap · points of interest · road class · traffic · distance to existing stations</p>
+  </div>
+</section>
+
+<!-- 8 -->
+<section class="slide" id="s8">
+  <span class="speaker">Marko</span>
+  <span class="kicker">Lena: “Which sites?”</span>
+  <h2>Spatial optimization picks sites under budget</h2>
+  <div class="chain">
+    <span class="box">Candidate sites</span><span class="arrow">→</span>
+    <span class="box" style="border-color:var(--accent);color:var(--accent)">Solver<br><small style="font-weight:400;color:var(--muted)">HiGHS · OR-Tools · PuLP</small></span><span class="arrow">→</span>
+    <span class="box">Ranked sites</span>
+  </div>
+  <div class="grid g3">
+    <div class="card"><h3>Road infrastructure</h3><p>Access via motorways, junctions, rest areas.</p></div>
+    <div class="card"><h3>Existing supply</h3><p>No new site where demand is already met.</p></div>
+    <div class="card"><h3>Points of interest</h3><p>Shops, hospitals, universities nearby.</p></div>
+  </div>
+</section>
+
+<!-- 9 -->
+<section class="slide" id="s9">
+  <span class="speaker">Marko</span>
+  <span class="kicker">Lena: “Can I defend this?”</span>
+  <h2>Validation in three steps</h2>
+  <div class="grid g3">
+    <div class="card"><span class="tag todo">Planned</span><h3 style="margin-top:10px">Time split</h3><p>Do recommendations match stations commissioned in 2025–26?</p></div>
+    <div class="card"><span class="tag todo">Data not yet collected</span><h3 style="margin-top:10px">Site-recommendation forums</h3><p>Compare our predictions with community suggestions.</p></div>
+    <div class="card"><span class="tag todo">Data not yet collected</span><h3 style="margin-top:10px">StandortTOOL</h3><p>Compare with a simulation-based demand estimator.</p></div>
+  </div>
+</section>
+
+<!-- 10 -->
+<section class="slide" id="s10">
+  <span class="speaker">Marko</span>
+  <span class="kicker">What Lena sees</span>
+  <h2>App, automation, documentation</h2>
+  <div class="grid g2">
+    <div class="card hl"><h3>App</h3><ul>
+      <li>Pick region and budget</li>
+      <li>See demand gap and over-/underused stations</li>
+      <li>Ranked sites with expected utilisation, uncertainty and assumptions</li></ul></div>
+    <div class="card"><h3>Automation</h3><ul>
+      <li>One entry point: download, validate, rebuild</li>
+      <li>Versioned in GitHub</li>
+      <li>README: run order, architecture, limitations</li></ul></div>
+  </div>
+</section>
+
+<!-- 11 -->
+<section class="slide" id="s11">
+  <span class="kicker">Status</span>
+  <h2>Where we are</h2>
+  <div class="grid g3">
+    <div class="card"><span class="tag ok">Done</span><ul style="margin-top:10px">
+      <li>Data pipeline, 500 m grids</li>
+      <li>Supply-gap layer with home-charging correction</li>
+      <li>Occupancy history processing</li>
+      <li>Interactive map, Street View, error logging</li></ul></div>
+    <div class="card"><span class="tag todo">In progress</span><ul style="margin-top:10px">
+      <li>Random Forest demand model</li>
+      <li>Site optimization</li></ul></div>
+    <div class="card"><span class="tag">Next</span><ul style="margin-top:10px">
+      <li>Validation</li>
+      <li>Budget and recommendation UI</li></ul></div>
+  </div>
+  <p class="lead">Now: the current map, with developer controls hidden.</p>
+</section>
+
+<!-- 12 demo -->
+<section class="slide demo" id="demo">
+  <div class="demo-bar">
+    <span class="kicker">Live demo · Arun</span>
+    <span class="tag">Try: Supply gap layer · click a 500 m cell · double-click a point for Street View</span>
+    <a href="../app/index.html" target="_blank" rel="noopener">Open full screen ↗</a>
+  </div>
+  <iframe id="app" title="EV charging map" data-src="../app/index.html" allow="fullscreen; geolocation"></iframe>
+</section>
+
+<script>
+  const slides = [...document.querySelectorAll("section.slide")];
+  const dots = document.getElementById("dots");
+  slides.forEach((s, i) => {
+    const a = document.createElement("a");
+    a.href = "#" + s.id; a.title = "Slide " + (i + 1);
+    dots.appendChild(a);
+  });
+  const links = [...dots.children];
+  const bar = document.getElementById("bar");
+  // Load the app only when the last slide gets close
+  const frame = document.getElementById("app");
+  const loadApp = () => { if (!frame.src) frame.src = frame.dataset.src; };
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (e.isIntersecting) {
+        links.forEach((l, i) => l.classList.toggle("on", slides[i] === e.target));
+        if (e.target.id === "s11" || e.target.id === "demo") loadApp();
+      }
+    });
+  }, { threshold: 0.55 });
+  slides.forEach((s) => io.observe(s));
+  addEventListener("scroll", () => {
+    const h = document.documentElement;
+    bar.style.width = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100 + "%";
+  }, { passive: true });
+  addEventListener("keydown", (e) => {
+    if (document.activeElement === frame) return;
+    const cur = links.findIndex((l) => l.classList.contains("on"));
+    let next = null;
+    if (["ArrowDown", "PageDown", " "].includes(e.key)) next = Math.min(cur + 1, slides.length - 1);
+    if (["ArrowUp", "PageUp"].includes(e.key)) next = Math.max(cur - 1, 0);
+    if (next !== null) { e.preventDefault(); slides[next].scrollIntoView(); }
+  });
+</script>
+</body>
+</html>
