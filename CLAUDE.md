@@ -9,7 +9,7 @@ EV charging station placement optimization for Baden-Württemberg. Interactive L
 ```bash
 pip install -r requirements.txt
 python src/extract.py          # Download raw data (if missing) and generate processed files (skips if output exists)
-python -m http.server 8000     # Serve the map at http://localhost:8000/app/
+python src/serve.py            # Serve the map at http://localhost:8000/app/ (also logs frontend errors to logs/error.log)
 ```
 
 ## Code conventions

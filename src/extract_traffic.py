@@ -2,6 +2,7 @@
 
 The tables have no coordinates, so site positions come from the SVZ station list on MobiData BW.
 """
+import error_log  # noqa: F401 (logs uncaught errors to logs/error.log)
 from pathlib import Path
 import re
 import urllib.request

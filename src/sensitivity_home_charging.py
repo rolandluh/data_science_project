@@ -13,6 +13,7 @@ and compare pressure with the station's time-weighted occupancy. Checks:
 Run from the project root: python src/sensitivity_home_charging.py
 Results: docs/sensitivity_home_charging_rate.md
 """
+import error_log  # noqa: F401 (logs uncaught errors to logs/error.log)
 import json
 
 import geopandas as gpd
