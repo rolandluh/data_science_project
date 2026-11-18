@@ -1,4 +1,5 @@
 """Data acquisition: download BKG district boundaries and Bundesnetzagentur charging stations, save Baden-Württemberg subsets."""
+import error_log  # noqa: F401 (logs uncaught errors to logs/error.log)
 from functools import lru_cache
 from pathlib import Path
 import json

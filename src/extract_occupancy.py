@@ -18,6 +18,7 @@ reserved > 0); stretches where all points are "unknown" (e.g. datex2_ecomovement
 Occupancy = charging points / (available + charging + reserved points), time-weighted.
 Out-of-order, inoperative and unknown points are left out of the denominator.
 """
+import error_log  # noqa: F401 (logs uncaught errors to logs/error.log)
 from pathlib import Path
 
 import geopandas as gpd
