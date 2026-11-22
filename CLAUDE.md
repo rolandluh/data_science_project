@@ -62,3 +62,18 @@ Each `save_*()` function skips if its output file already exists. Delete the out
 - Branch protections (PR required, signed commits)
 - Never push to main, always create a branch first, and then commit thourgh it and create a pull request
 - Commit messages don't include claude participation
+
+## Analysis phase (demand estimation → recommendation → spatial optimization)
+
+The pipeline and map exist; the model is the main open piece (see `todos.md`). Plan: `docs/analysis_plan.md`. Method ideas: `notes and concepts/Analysis Ideas.md`. Inputs: `docs/model_inputs.md`. Literature: `literature/`. Past problems and decisions: `docs/problems_and_solutions.md`.
+
+### Working rules
+
+- Be pragmatic: simplest defensible method first, with a baseline before anything more complex. 
+- For a non-trivial method choice, give 2–3 options with trade-offs and a recommendation instead of silently picking one.
+- State assumptions and parameters explicitly and keep tunable ones in one place, not buried in code. Log non-obvious decisions (what, why, alternatives rejected) in the Decisions section of `docs/analysis_plan.md`.
+- Say when unsure or when a claim isn't backed by our data or `literature/`. Don't invent citations or numbers.
+- Every model or output needs a validation: baseline comparison, time split and/or spatial hold-out, sensitivity check.
+- Grading rewards automation, error handling, validation and readable documentation. Prefer scripts in `src/` over notebooks, and plug new steps into the existing structure (`prepare.py`, `analyze.py`, `evaluate.py`, `validate.py`, `run_pipeline.py` are currently stubs).
+
+Project skills and a review subagent live in `.claude/` (`methodology-review`, `validation-design`, `pipeline-step`, `method-reviewer`). Personal overrides go in `CLAUDE.local.md` / `.claude/settings.local.json` (git-ignored).
