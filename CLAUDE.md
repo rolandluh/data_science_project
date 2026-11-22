@@ -65,7 +65,7 @@ Each `save_*()` function skips if its output file already exists. Delete the out
 
 ## Analysis phase (demand estimation → recommendation → spatial optimization)
 
-The pipeline and map exist; the model is the main open piece (see `todos.md`). Plan: `docs/analysis_plan.md`. Method ideas: `notes and concepts/Analysis Ideas.md`. Inputs: `docs/model_inputs.md`. Literature: `literature/`. Past problems and decisions: `docs/problems_and_solutions.md`.
+The pipeline and map exist; the model is the main open piece (see `todos.md`). Plan: `docs/analysis_plan.md`. Method ideas: `notes and concepts/Analysis Ideas.md`. Inputs: `docs/model_inputs.md`. Literature: `literature/`.
 
 ### Working rules
 
