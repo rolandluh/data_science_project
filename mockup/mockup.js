@@ -7,7 +7,7 @@ import { loadJSON, toast } from "../app/js/status.js";
 
 const DATA = "../data/processed/mockup/";
 const LOAD_ID = Date.now();
-const DATA_VERSION = 3; // must match DATA_VERSION in src/mockup_data.py
+const DATA_VERSION = 4; // must match DATA_VERSION in src/mockup_data.py
 const FILES = ["candidates", "cells", "stations", "overused", "sizing", "scenarios", "defaults", "places"];
 const TYPES = ["AC", "DC"];
 const YEARS = ["2030", "2035"];
@@ -218,7 +218,8 @@ function prepareCandidates() {
     occ: new Float32Array(n),
     kreis: new Uint8Array(n),
     type: new Uint8Array(n), // 0 AC, 1 DC
-    low: new Uint8Array(n),
+    low: new Uint8Array(n), // derived from feedM and the user's low-confidence distance (setLowConfidence)
+    feedM: new Float32Array(n),
   };
   rows.forEach((row, i) => {
     arrays.lat[i] = row[col.lat];
@@ -226,9 +227,20 @@ function prepareCandidates() {
     arrays.occ[i] = row[col.occ];
     arrays.kreis[i] = row[col.kreis];
     arrays.type[i] = row[col.type] === "DC" ? 1 : 0;
-    arrays.low[i] = row[col.low_conf];
+    arrays.feedM[i] = row[col.feed_m];
   });
   return arrays;
+}
+
+// Low confidence = nearest station with usage data further away than the threshold (§7, simplified)
+function setLowConfidence(km) {
+  const limit = km * 1000;
+  let count = 0;
+  for (let i = 0; i < C.n; i++) {
+    C.low[i] = C.feedM[i] > limit ? 1 : 0;
+    count += C.low[i];
+  }
+  return count;
 }
 
 function prepareFactors() {
@@ -268,6 +280,10 @@ const state = {
   maxPts: { AC: 8, DC: 12 },
   spacing: { AC: 500, DC: 3000 },
   hideLow: false,
+  level: "standard", // occupancy level for sizing: comfortable / standard / lean
+  lowConfKm: 2,
+  minUse: { AC: null, DC: null }, // minimum hours per point per day at the recommended size
+  lowCount: 0,
   overrides: new Map(), // candidate id -> points
   tab: "AC",
   active: null, // selected pick id
@@ -378,11 +394,23 @@ function readInputs() {
   state.charger = radioValue("charger");
   state.budgetMode = radioValue("budget-mode");
   state.hideLow = byId("hide-low").checked;
+  state.level = radioValue("level") || "standard";
+  const lowConfKm = Math.max(0.1, numberOf(byId("lowconf-km"), D.candidates.meta.low_confidence_m / 1000));
+  if (lowConfKm !== state.lowConfKm || !state.lowCount) {
+    state.lowConfKm = lowConfKm;
+    state.lowCount = setLowConfidence(lowConfKm);
+  }
+  byId("lowconf-note").textContent = `${num((state.lowCount / C.n) * 100, 1)} % of all candidates`;
+  const targets = D.sizing.targets_by_level[state.level];
+  byId("level-note").textContent = `A new site may be full (a whole hour with every point busy) on at most ${num(targets.AC * 100, 1)} % of days (AC) / ` +
+    `${num(targets.DC * 100, 1)} % (DC): as full as the ${num(D.sizing.levels[state.level] * 100, 0)}th percentile of today's stations.`;
   TYPES.forEach((t) => {
     const budget = numberOrNull(byId(`budget-${t}`));
     state.budget[t] = budget === null ? null : Math.max(0, budget);
     state.maxPts[t] = Math.max(1, Math.round(numberOf(byId(`maxpts-${t}`), D.defaults.max_points[t])));
     state.spacing[t] = Math.max(0, numberOf(byId(`spacing-${t}`), D.defaults.spacing_m[t]));
+    const minUse = numberOrNull(byId(`minuse-${t}`));
+    state.minUse[t] = minUse === null || minUse <= 0 ? null : Math.min(minUse, 24);
   });
   document.querySelectorAll("[data-cost]").forEach((input) => {
     const [t, key] = input.dataset.cost.split(".");
@@ -417,6 +445,8 @@ function initInputs() {
     byId(`spacing-${t}`).value = d.spacing_m[t];
   });
   byId("radius").value = "";
+  byId("lowconf-km").value = D.candidates.meta.low_confidence_m / 1000;
+  TYPES.forEach((t) => { byId(`minuse-${t}`).value = ""; });
   byId("place").value = "";
   document.querySelectorAll('input[name="area-mode"], input[name="charger"]').forEach((input) => { input.checked = false; });
   buildCostTable();
@@ -567,7 +597,7 @@ function sizeFor(type, occ2) {
   if (!steps.length || steps[steps.length - 1] !== max) steps.push(max);
   for (const n of steps) {
     const share = lookupFullShare(type, n, (occ2 * ref) / n);
-    if (share <= S.targets[type]) return { n, share, capped: false };
+    if (share <= S.targets_by_level[state.level][type]) return { n, share, capped: false };
   }
   return { n: max, share: lookupFullShare(type, max, (occ2 * ref) / max), capped: true };
 }
@@ -592,7 +622,7 @@ function optimize(type, inArea) {
   const active = activeTypes().includes(type);
   const budget = active ? state.budget[type] || 0 : 0;
   const ref = D.sizing.reference_points;
-  const result = { type, budget, used: 0, picks: [], inArea: 0, skippedSpacing: 0 };
+  const result = { type, budget, used: 0, picks: [], inArea: 0, skippedSpacing: 0, skippedMinUse: 0 };
   if (!active) return result;
 
   // 1. candidates of this type in the area
@@ -635,10 +665,14 @@ function optimize(type, inArea) {
     const sized = sizeFor(type, C.occ[i]);
     const override = state.overrides.get(id);
     const points = override || sized.n;
+    const pointHours = C.occ[i] * ref * 24;
+    if (state.minUse[type] !== null && pointHours / points < state.minUse[type]) {
+      result.skippedMinUse++;
+      continue;
+    }
     const cost = siteCost(type, points);
     if (cost > remaining) continue;
     remaining -= cost;
-    const pointHours = C.occ[i] * ref * 24;
     result.picks.push({ i, id, type, occ2: C.occ[i], pointHours, hoursPerPoint: pointHours / points, points, sized,
       override: Boolean(override), cost, low: Boolean(C.low[i]) });
     if (!grid.has(key(gx, gy))) grid.set(key(gx, gy), []);
@@ -673,7 +707,7 @@ function run() {
     state.fitPending = false;
     fitArea();
   }
-  const areaKey = `${state.areaMode}|${state.center}|${state.radiusKm}|${[...state.kreise]}|${state.charger}|${state.hideLow}`;
+  const areaKey = `${state.areaMode}|${state.center}|${state.radiusKm}|${[...state.kreise]}|${state.charger}|${state.hideLow}|${state.lowConfKm}`;
   if (areaKey !== lastAreaKey) {
     lastAreaKey = areaKey;
     if (byId("layer-candidates").checked) drawCandidates();
@@ -835,6 +869,7 @@ function renderResults() {
       <div class="summary-sub">${euro(res.budget - res.used)} left of ${euro(res.budget)}</div>
       ${res.picks.length ? `<div class="summary-sub">Demand, point-h / day: ${demand.map(([y, v]) => `${y} <b>${num(v, 0)}</b>`).join(" · ")} <span class="tag-synthetic">synthetic</span></div>` : ""}
       ${res.inArea === 0 ? `<div class="summary-sub">No ${type} candidates in the area.</div>` : ""}
+      ${state.minUse[type] !== null ? `<div class="summary-sub">Minimum usage ${num(state.minUse[type], 1)} h per point per day: ${num(res.skippedMinUse)} candidates below it skipped.</div>` : ""}
     </div>`;
   }).join("");
 
@@ -846,7 +881,8 @@ function renderResults() {
   if (!res || !res.picks.length) {
     const why = !res || !activeTypes().includes(state.tab) ? `${state.tab} is not selected.` :
       res.inArea === 0 ? `No ${state.tab} candidates in the area.` :
-        `The ${state.tab} budget is smaller than the cheapest site (${euro(siteCost(state.tab, 2))}).`;
+        res.skippedMinUse > 0 ? `No ${state.tab} site in the area reaches the minimum usage of ${num(state.minUse[state.tab], 1)} h per point per day.` :
+          `The ${state.tab} budget is smaller than the cheapest site (${euro(siteCost(state.tab, 2))}).`;
     list.innerHTML = `<li class="picks-empty">No picks. ${why}</li>`;
     return;
   }
@@ -1037,7 +1073,7 @@ function renderLegend() {
       <li><span class="pick-marker ac legend-marker">1</span>AC pick (number = rank)</li>
       <li><span class="pick-marker dc legend-marker">1</span>DC pick (number = rank)</li>
       <li><span class="pick-pts legend-pts">4</span>Charging points at the site</li>
-      <li><span class="legend-pick low" style="background:var(--text-3)"></span>Low confidence</li></ul></div>`);
+      <li><span class="pick-marker ac low legend-marker">1</span>Low confidence (dashed outline)</li></ul></div>`);
   }
   if (byId("layer-usage").checked) {
     blocks.push(`<div class="legend-block"><p class="legend-title">Expected usage <span class="tag-synthetic">synthetic</span></p>

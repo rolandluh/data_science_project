@@ -509,8 +509,11 @@
 }
 
 .pick-marker.low {
-  border-style: dashed;
-  border-color: #fbbf24;
+  border: 2.5px dashed #f59e0b;
+}
+
+.legend-marker.low {
+  border-width: 2px;
 }
 
 .pick-marker.is-active {

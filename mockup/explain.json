@@ -89,7 +89,7 @@
   },
   "points": {
     "title": "Number of points (sizing rule)",
-    "text": "The smallest point count whose site would be full (a whole hour with every point busy) no more often than 3 in 4 of today's stations of its type: about 31 % of days for AC, 5 % for DC. The share comes from a lookup table of today's stations. On the map the yellow badge next to each pick shows this number; you can override it per pick in the results list.",
+    "text": "The smallest point count whose site would be full (a whole hour with every point busy) no more often than the chosen occupancy level allows (Standard: as often as 3 in 4 of today's stations of its type, about 31 % of days for AC and 5 % for DC). The share comes from a lookup table of today's stations. On the map the yellow badge next to each pick shows this number; you can override it per pick in the results list.",
     "ref": "Decision record §5"
   },
   "site_cost": {
@@ -99,7 +99,7 @@
   },
   "confidence": {
     "title": "Low confidence",
-    "text": "Few charging stations like this one exist nearby, so this estimate is less reliable. The real flag combines the distance to the nearest station with usage data (threshold from the error-vs-distance plot) with features outside the training range; the mock-up uses only the distance (> 2 km).",
+    "text": "Few charging stations like this one exist nearby, so this estimate is less reliable. The real flag combines the distance to the nearest station with usage data (threshold from the error-vs-distance plot) with features outside the training range; the mock-up uses only the distance (default 2 km, adjustable under Advanced).",
     "ref": "Decision record §7"
   },
   "dc_reason": {
@@ -141,5 +141,20 @@
     "title": "Street View",
     "text": "Google Street View at the site, the same keyless embed as in the main app. Imagery can be years old or missing in rural areas; use it to check access, space and surroundings.",
     "ref": "app/js/streetview.js"
+  },
+  "adv_level": {
+    "title": "How full may a new site get?",
+    "text": "Sets how often a recommended site may be full (a whole hour with every point busy): Comfortable = as often as today's median station, Standard = the 75th percentile (v1 default), Lean = the 90th percentile, each per type. Comfortable gives more points per site and fewer sites per budget; Lean the opposite. The percentages come from today's stations with usage data.",
+    "ref": "Decision record §5; user_input.md (occupancy level)"
+  },
+  "adv_min_usage": {
+    "title": "Minimum usage per site",
+    "text": "Candidates whose predicted usage at the recommended size stays below this many hours per point per day are skipped, even if budget is left. Use it to avoid sites that would barely be used. Empty = no minimum.",
+    "ref": "user_input.md (advanced)"
+  },
+  "adv_lowconf_km": {
+    "title": "Low-confidence distance",
+    "text": "A candidate is flagged 'Low confidence' when the nearest station with usage data is further away than this. The real product sets the default from the plot of model error against distance and also flags features outside the training range.",
+    "ref": "Decision record §7"
   }
 }

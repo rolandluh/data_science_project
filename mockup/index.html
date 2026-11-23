@@ -139,6 +139,23 @@
         <details class="input-block advanced">
           <summary>Advanced <span class="hint-inline">defaults are fine</span></summary>
           <div class="adv-group">
+            <p class="subhead">How full may a new site get? <button class="info" type="button" data-info="adv_level" aria-label="About the occupancy level">i</button></p>
+            <fieldset class="segmented" aria-label="Occupancy level">
+              <legend class="visually-hidden">Occupancy level</legend>
+              <label><input type="radio" name="level" value="comfortable"><span>Comfortable</span></label>
+              <label><input type="radio" name="level" value="standard" checked><span>Standard</span></label>
+              <label><input type="radio" name="level" value="lean"><span>Lean</span></label>
+            </fieldset>
+            <p id="level-note" class="hint"></p>
+          </div>
+          <div class="adv-group">
+            <p class="subhead">Minimum usage per site (h per point per day) <button class="info" type="button" data-info="adv_min_usage" aria-label="About minimum usage">i</button></p>
+            <div class="pair">
+              <label class="field" data-type="AC">AC <input id="minuse-AC" type="number" min="0" max="24" step="0.5" placeholder="none"></label>
+              <label class="field" data-type="DC">DC <input id="minuse-DC" type="number" min="0" max="24" step="0.5" placeholder="none"></label>
+            </div>
+          </div>
+          <div class="adv-group">
             <p class="subhead">Max points per site <button class="info" type="button" data-info="adv_max_points" aria-label="About max points">i</button></p>
             <div class="pair">
               <label class="field" data-type="AC">AC <input id="maxpts-AC" type="number" min="2" max="40" step="1"></label>
@@ -156,6 +173,13 @@
             <p class="subhead">Points per pick <button class="info" type="button" data-info="points" aria-label="About points per pick">i</button></p>
             <p class="hint">Override the number of points in the results list. <span id="override-count"></span></p>
             <button id="override-reset" class="btn-ghost small" type="button" disabled>Clear overrides</button>
+          </div>
+          <div class="adv-group">
+            <p class="subhead">Low confidence beyond (km) <button class="info" type="button" data-info="adv_lowconf_km" aria-label="About the low-confidence distance">i</button></p>
+            <div class="field-row">
+              <input id="lowconf-km" class="num-input" type="number" min="0.1" max="50" step="0.5" aria-label="Low confidence beyond this distance in km">
+              <span id="lowconf-note" class="hint grow"></span>
+            </div>
           </div>
           <label class="layer-row">
             <span class="layer-text"><span class="layer-name">Hide low-confidence candidates <button class="info" type="button" data-info="adv_hide_low" aria-label="About hiding low-confidence candidates">i</button></span></span>
