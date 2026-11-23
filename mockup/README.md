@@ -11,7 +11,13 @@ python src/mockup_data.py   # writes data/processed/mockup/*.json (about 40 s; n
 python src/serve.py         # http://localhost:8000/mockup/
 ```
 
-`src/mockup_data.py` follows the pipeline pattern: each `save_*()` skips if its output exists. Delete a file (or the whole `data/processed/mockup/` folder) to regenerate it. It needs geopandas, scikit-learn and pyarrow (all in `requirements.txt`). If a file is missing, the page says so and shows the command to run.
+**The generated data is not in git** (`data/` is git-ignored), so everyone runs `python src/mockup_data.py` once on their own computer. It needs:
+
+- the processed files from `python src/extract.py`: `kreise_bw.geojson`, `ladesaeulen.json`, `historie_bw.geojson`, `bevoelkerung_500m.json`, `poi_osm_bw.geojson`, `strassen_osm_bw.geojson`, `strassenpunkte_osm_bw.geojson`, `parkplaetze_kombiniert_bw.geojson`, `auslastung_taeglich_bw.parquet` and `auslastung_stationen_bw.parquet` (occupancy, `src/extract_occupancy.py`);
+- `data/raw/vg250.zip` (BKG boundaries, downloaded by `src/extract.py`);
+- geopandas, scikit-learn and pyarrow (all in `requirements.txt`).
+
+If an input is missing, the script stops and names it. It follows the pipeline pattern: each `save_*()` skips if its output exists **and** was written by the current `DATA_VERSION`; files from an older version are regenerated, so after pulling new mock-up code just run the script again. The page checks the same version and says which files are missing or outdated.
 
 ## What is real, what is synthetic
 
@@ -23,7 +29,7 @@ python src/serve.py         # http://localhost:8000/mockup/
 | Low-confidence flag | real data, simplified rule | nearest station with usage data (MobiData BW live feed, `historie_bw.geojson`) more than **2 km** away (12.9 % of candidates). The real flag also checks features outside the training range (§7). |
 | Features shown per pick | real | residents within 1 km (Zensus 500 m cells), OSM destinations within 500 m, distance to the nearest major road |
 | Existing stations layer | real | `ladesaeulen.json` (register, 1 Sep 2026) |
-| Place search for the radius centre | real | 1,106 BW municipalities from `gemeinden_ev.geojson` (a point inside each); towns with the same name get their Kreis added |
+| Place search for the radius centre | real | 1,103 BW municipalities from BKG VG250 (`data/raw/vg250.zip`, downloaded by `src/extract.py`; a point inside each); towns with the same name get their Kreis added |
 | Overused stations layer | real | `auslastung_taeglich_bw.parquet`: valid days only, stations with ≥ 14 valid days; full day = `peak_hour_occupancy` ≥ 0.999; overused = share of full days above the class target; locations from `historie_bw.geojson` (5,069 stations, 1,292 overused) |
 | Sizing lookup table and targets | real | same stations; median share of full days by AC/DC (≥ 50 kW = DC), point-count class (2 / 4 / 6 / 8 / 10+) and occupancy bin (0–5–10–15–20–25–30–40–100 %). Targets = 75th percentile: **AC 30.9 %, DC 4.7 %** of days |
 | Supply trend | real | register commissioning dates: **5,860 points added per year** (mean 2023–25); 35,202 points today |
@@ -60,7 +66,7 @@ All tunable values are at the top of `src/mockup_data.py` and are also written i
 
 ## Data files
 
-All files are in `data/processed/mockup/` (git-ignored). Tables use the same `{columns, rows}` layout as `ladesaeulen.json`; each file has a `meta` block (`generated`, `source`, `synthetic` = list of synthetic fields, plus the parameters used). **To go live, the pipeline writes the same files with real values** and removes the field names from `meta.synthetic`; the banner and tags can then be dropped.
+All files are in `data/processed/mockup/` (git-ignored). Tables use the same `{columns, rows}` layout as `ladesaeulen.json`; each file has a `meta` block (`version` = `DATA_VERSION`, `generated`, `source`, `synthetic` = list of synthetic fields, plus the parameters used). **To go live, the pipeline writes the same files with real values** and removes the field names from `meta.synthetic`; the banner and tags can then be dropped.
 
 ### `candidates.json`
 ```
