@@ -1,7 +1,7 @@
 # Analysis plan: demand estimation, recommendation, spatial optimization
 
 Status: draft skeleton. Fill in section by section; keep each section short and decision-oriented.
-Related: `notes and concepts/Analysis Ideas.md` (levels A0-A2 / B0-B2), `docs/model_inputs.md` (data), `docs/project_outline.md` (related work), `literature/`.
+Related: `notes and concepts/demand_estimation_v1.md` (decision record), `docs/model_inputs.md` (data), `docs/project_outline.md` (related work), `literature/`.
 
 ## 1. Goal and scope
 - Decision to support: where to place k new charging sites in BW, under a budget.
@@ -21,7 +21,7 @@ Baselines, time split, spatial hold-out, sensitivity, solver checks (see `.claud
 |---|---|---|---|
 
 ## 7. Decisions
-Date, decision, reason, alternatives rejected.
+Currently recorded in `notes and concepts/demand_estimation_v1.md`; move final ones here.
 
 ## 8. Risks and limitations
 
