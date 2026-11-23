@@ -36,18 +36,6 @@ All in all, good start \+ a benchmark
 * \*\*B0 Greedy maximum coverage search  
   * Classify a radius R around existing CS as covered  
   * maximize Σ demand × covered subject to at most k new sites  
-* **C Evaluation**  
-  * tbd
-
-# **Level 1: Best algorithms**
-
-No ML, nothing fancy, methodological perfection
-
-* **B1: Exact optimization**  
-  * Don't use greedy, heuristic algorithms, but mathematical optimization  
-  * Open-source, common practice models: HiGHS solver or OR-Tools or PuLP.  
-* **A1: Better Demand estimation:**  
-  * Add weights to the demand model: house/apartment population density, proximity to points of interest, other important factors from literature
 
 # **Level 2: ML**
 
