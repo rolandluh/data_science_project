@@ -21,7 +21,7 @@ from sklearn.neighbors import KDTree
 PROCESSED = Path("data/processed")
 OUT_DIR = PROCESSED / "mockup"
 # Bump when a file's content or schema changes: files of an older version are regenerated, and the page refuses them
-DATA_VERSION = 2
+DATA_VERSION = 3
 VG250_ZIP = Path("data/raw/vg250.zip")  # BKG boundaries, downloaded by src/extract.py (save_districts)
 VG250_TOWNS = "vg250_01-01.geo84.shape.ebenen/vg250_ebenen_0101/VG250_GEM.shp"
 METRIC_CRS = "EPSG:25832"  # metres, for all distances
@@ -85,10 +85,15 @@ DEFAULTS = {
 }
 
 
+def text(value):
+    """String or "" for missing values (None or NaN, depending on the geopandas/pyogrio version)."""
+    return "" if value is None or (isinstance(value, float) and np.isnan(value)) else str(value)
+
+
 def write_json(path, payload):
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, separators=(",", ":"))
+        json.dump(payload, f, ensure_ascii=False, separators=(",", ":"), allow_nan=False)  # NaN is not valid JSON
     print(f"Saved {path} ({path.stat().st_size / 1e6:.1f} MB)")
 
 
@@ -272,7 +277,7 @@ def save_candidates(inputs, kreise, stats, feed, out=OUT_DIR / "candidates.json"
     rows = [
         [i, float(lat[i]), float(lon[i]), kreis_index[parking.at[i, "AGS"]], cls[i], round(float(occupancy[i]), 4), int(low[i]),
          int(round(feed_m[i])), reason[i], int(round(residents[i])), int(destinations[i]), int(round(road[i])),
-         parking.at[i, "parking"] or "", parking.at[i, "source"]]
+         text(parking.at[i, "parking"]), text(parking.at[i, "source"])]
         for i in range(len(parking))
     ]
     write_json(out, {
@@ -318,7 +323,7 @@ def save_stations(out=OUT_DIR / "stations.json"):
         points = pd.to_numeric(r[col["Anzahl Ladepunkte"]], errors="coerce")
         kw = pd.to_numeric(str(r[col["Nennleistung Ladeeinrichtung [kW]"]]).replace(",", "."), errors="coerce")
         rows.append([round(float(lat), 5), round(float(lon), 5), int(points) if pd.notna(points) else None,
-                     float(kw) if pd.notna(kw) else None, r[col["Betreiber"]], r[col["Ort"]]])
+                     float(kw) if pd.notna(kw) else None, text(r[col["Betreiber"]]), text(r[col["Ort"]])])
     write_json(out, {"meta": meta("ladesaeulen.json (Bundesnetzagentur register)", synthetic=[]),
                      "columns": ["lat", "lon", "points", "kw", "operator", "city"], "rows": rows})
 
@@ -329,7 +334,7 @@ def save_overused(stats, feed, targets, out=OUT_DIR / "overused.json"):
         return
     located = stats.join(feed.set_index("id")[["geometry"]], how="inner")
     rows = [[sid, round(g.y, 5), round(g.x, 5), c, round(float(share), 4), round(float(occ), 4), int(days), int(share > targets[c]),
-             name, operator]
+             text(name), text(operator)]
             for sid, g, c, share, occ, days, name, operator in
             located[["geometry", "cls", "full_share", "occupancy", "days", "name", "operator_name"]].itertuples()]
     write_json(out, {"meta": {**meta("auslastung_taeglich_bw.parquet, historie_bw.geojson", synthetic=[]),

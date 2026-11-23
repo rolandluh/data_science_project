@@ -7,7 +7,7 @@ import { loadJSON, toast } from "../app/js/status.js";
 
 const DATA = "../data/processed/mockup/";
 const LOAD_ID = Date.now();
-const DATA_VERSION = 2; // must match DATA_VERSION in src/mockup_data.py
+const DATA_VERSION = 3; // must match DATA_VERSION in src/mockup_data.py
 const FILES = ["candidates", "cells", "stations", "overused", "sizing", "scenarios", "defaults", "places"];
 const TYPES = ["AC", "DC"];
 const YEARS = ["2030", "2035"];
