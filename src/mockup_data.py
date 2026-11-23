@@ -21,7 +21,7 @@ from sklearn.neighbors import KDTree
 PROCESSED = Path("data/processed")
 OUT_DIR = PROCESSED / "mockup"
 # Bump when a file's content or schema changes: files of an older version are regenerated, and the page refuses them
-DATA_VERSION = 3
+DATA_VERSION = 4
 VG250_ZIP = Path("data/raw/vg250.zip")  # BKG boundaries, downloaded by src/extract.py (save_districts)
 VG250_TOWNS = "vg250_01-01.geo84.shape.ebenen/vg250_ebenen_0101/VG250_GEM.shp"
 METRIC_CRS = "EPSG:25832"  # metres, for all distances
@@ -64,6 +64,8 @@ POINT_CLASSES = ["2", "4", "6", "8", "10+"]
 OCC_BIN_EDGES = [0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 1.01]
 MIN_STATIONS_PER_CELL = 10  # sparser lookup cells are filled from their neighbours
 TARGET_PERCENTILE = 0.75  # target = share of full days at today's 75th percentile station of the class
+# Occupancy level the user can choose (user_input.md): how often a new site may be full, as a percentile of today's stations
+OCCUPANCY_LEVELS = {"comfortable": 0.50, "standard": TARGET_PERCENTILE, "lean": 0.90}
 MAX_POINTS = {"AC": 8, "DC": 12}
 REFERENCE_POINTS = 2  # predictions are read as occupancy at 2 points (§5 step 1)
 
@@ -379,6 +381,9 @@ def save_sizing(stats, targets, out=OUT_DIR / "sizing.json"):
         "occ_bin_edges": OCC_BIN_EDGES,
         "target_percentile": TARGET_PERCENTILE,
         "targets": targets,
+        "levels": OCCUPANCY_LEVELS,
+        "targets_by_level": {level: {c: round(float(stats.loc[stats["cls"] == c, "full_share"].quantile(q)), 4) for c in ("AC", "DC")}
+                             for level, q in OCCUPANCY_LEVELS.items()},
         "max_points": MAX_POINTS,
         "full_share": table,
         "station_counts": counts,
