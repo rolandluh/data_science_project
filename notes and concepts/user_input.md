@@ -34,13 +34,15 @@ Per class (AC / DC). Defaults come from the cost list (`todos.md`), each marked 
 | Points per site, per pick | from sizing | User override for a single site | ✅ |
 | Minimum spacing between picks | one value per class, larger for DC (still to set) | Spacing rule (§9) | ✅ rule / ❓ values |
 | Hide low-confidence candidates | off | Removes candidates with the "Low confidence" flag (§7) | ❓ |
+| Occupancy level (how often a new site may be full) | Standard = 75th percentile of today's stations (AC ≈ 31 %, DC ≈ 5 % of days); Comfortable = 50th (≈ 10 % / 1 %), Lean = 90th (≈ 58 % / 14 %) | Points per site and cost (§5) | ✅ (23 Nov 2026) |
+| Minimum usage per site | none; hours per point per day at the recommended size, one value per class | Skips candidates below it, even if budget is left | ✅ (23 Nov 2026) |
+| Low-confidence distance | 2 km to the nearest station with usage data (until the error-vs-distance plot sets it, §7) | Which candidates get the "Low confidence" flag | ✅ (23 Nov 2026) |
 
 ## Future inputs (not in v1)
 
 | Input | Default | What it would change |
 |---|---|---|
 | Own operator group | none (feed operator mix, §4) | Predictions as if this operator group built the site |
-| Occupancy level (how often a site may be full) | v1 fixed: as full as 3 in 4 of today's stations (AC ≈ 31%, DC ≈ 5% of days). Later as presets, e.g. comfortable / standard / lean = 50th / 75th / 90th percentile | Points per site and cost (§5) |
 
 ## Not user input in v1
 

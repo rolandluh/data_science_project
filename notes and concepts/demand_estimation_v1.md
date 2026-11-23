@@ -199,6 +199,7 @@ Each decision has a short *why* and, where relevant, *limits*.
 3. Spread it over n = 2, 4, 6, … points (occupancy at n points = occupancy × 2 / n).
 4. Choose the smallest n whose expected share of "full" days is ≤ the target of its class. **Full day** = the day's busiest hour had every point occupied for the whole hour (`peak_hour_occupancy` = 100% in the daily file). **Target** = the 75th percentile of today's stations of the same class: AC ≈ 31%, DC ≈ 5% of days (stations with ≥ 14 valid days). The expected share comes from a lookup table built from existing stations: median share of full days by power class, point-count class and mean-occupancy bin.
 5. Cap at a maximum (parameter, e.g. 8 AC / 12 DC). The user can override the result.
+6. The target percentile is a user setting (23 Nov 2026): Comfortable / Standard / Lean = 50th / 75th / 90th percentile of today's stations of the class; Standard (75th) is the default described above.
 - *Why:* it answers "how many points?" with data we have, and it uses the peak / saturation information. It is easy to explain: "a new site should be full no more often than 3 in 4 of today's stations of its type." Data: 2-point AC sites at 15–20% mean occupancy have a full hour on 25% of days, at 20–25% on 38%; 4-point DC sites are rarely full.
 - *Why a full hour:* it is the finest level in the processed daily data (one peak-hour value per day), and it is unambiguous: anyone arriving in that hour found no free point.
 - *Why per class and anchored to today:* a single 25% target was judgement; today only 5% of DC stations are that full (median AC station: 10% of days, median DC: 1%), and DC drivers are mid-trip and less willing to wait. Anchoring to today's 75th percentile gives each class the service level of today's typical stations.
@@ -233,7 +234,7 @@ Each decision has a short *why* and, where relevant, *limits*.
 - *Limits:* differences in unobserved factors such as price remain uncorrected.
 
 ✅ **"Low confidence" warning for the user (technically an out-of-range flag).** Shown on a candidate when it is far from every existing station or some of its key features lie outside the training range (1st–99th percentile). User text: *"Few charging stations like this one exist nearby, so this estimate is less reliable."* No prediction intervals.
-- *Method:* model error from block CV is plotted against distance to the nearest training site (site count per distance bin reported). The distance threshold is the largest well-populated bin where predictions are still reliable.
+- *Method:* model error from block CV is plotted against distance to the nearest training site (site count per distance bin reported). The distance threshold is the largest well-populated bin where predictions are still reliable. The user can change the distance under Advanced (23 Nov 2026); the plot sets the default (mock-up: 2 km).
 - *Why:* it makes the selection bias visible to the user.
 
 ✅ **Censoring is documented for the mean target. No Tobit model.**

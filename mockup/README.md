@@ -26,12 +26,12 @@ If an input is missing, the script stops and names it. It follows the pipeline p
 | Candidate sites (115,102) | real | `parkplaetze_kombiniert_bw.geojson`, without `access` = private / no / permit; inside a BW Kreis |
 | Kreis of each candidate | real | spatial join with `kreise_bw.geojson` |
 | AC/DC type per candidate | real data, v1 rule (§6) | DC if within **300 m** of a motorway junction, rest area or services (`strassenpunkte_osm_bw`), within **25 m** of a primary road (`strassen_osm_bw`, `highway=primary`), or within **100 m** of a supermarket (`poi_osm_bw`); else AC. Result: 13.8 % DC. Supermarket tie-breakers (§6) are not applied. |
-| Low-confidence flag | real data, simplified rule | nearest station with usage data (MobiData BW live feed, `historie_bw.geojson`) more than **2 km** away (12.9 % of candidates). The real flag also checks features outside the training range (§7). |
+| Low-confidence flag | real data, simplified rule | nearest station with usage data (MobiData BW live feed, `historie_bw.geojson`) more than **2 km** away by default (12.9 % of candidates; adjustable, computed in the page from `feed_m`). The real flag also checks features outside the training range (§7). |
 | Features shown per pick | real | residents within 1 km (Zensus 500 m cells), OSM destinations within 500 m, distance to the nearest major road |
 | Existing stations layer | real | `ladesaeulen.json` (register, 1 Sep 2026) |
 | Place search for the radius centre | real | 1,103 BW municipalities from BKG VG250 (`data/raw/vg250.zip`, downloaded by `src/extract.py`; a point inside each); towns with the same name get their Kreis added |
 | Overused stations layer | real | `auslastung_taeglich_bw.parquet`: valid days only, stations with ≥ 14 valid days; full day = `peak_hour_occupancy` ≥ 0.999; overused = share of full days above the class target; locations from `historie_bw.geojson` (5,069 stations, 1,292 overused) |
-| Sizing lookup table and targets | real | same stations; median share of full days by AC/DC (≥ 50 kW = DC), point-count class (2 / 4 / 6 / 8 / 10+) and occupancy bin (0–5–10–15–20–25–30–40–100 %). Targets = 75th percentile: **AC 30.9 %, DC 4.7 %** of days |
+| Sizing lookup table and targets | real | same stations; median share of full days by AC/DC (≥ 50 kW = DC), point-count class (2 / 4 / 6 / 8 / 10+) and occupancy bin (0–5–10–15–20–25–30–40–100 %). Targets per occupancy level = 50th / 75th / 90th percentile: Comfortable **AC 9.8 %, DC 1.1 %**, Standard **AC 30.9 %, DC 4.7 %**, Lean **AC 57.9 %, DC 14.1 %** of days |
 | Supply trend | real | register commissioning dates: **5,860 points added per year** (mean 2023–25); 35,202 points today |
 | Occupancy cap for scenarios | real | 99th percentile of today's station occupancy (AC 0.54, DC 0.39) |
 | **Predicted occupancy per candidate** | **synthetic** | score = weighted z-scores of real features (residents, destinations, closeness to a major road, motorway bonus for DC) + noise; its rank is mapped onto today's observed occupancy distribution of the class (1st–99th percentile), then shrunk 40 % toward the mean (RandomForest predictions are compressed). Weights in `SYNTHETIC_WEIGHTS`. |
@@ -44,9 +44,9 @@ All tunable values are at the top of `src/mockup_data.py` and are also written i
 ## What the page does
 
 - **Start:** the main inputs (area, charger type, budget) are empty and there are no results; the results panel shows a checklist of what is still missing. Advanced settings and cost components start at their defaults. All map layers start off.
-- **Inputs:** strategy (Usage active; Coverage and Mix shown as planned), area (radius around a town from the search or a map click, + km; or one or more Landkreise from the list or by clicking the map), charger type, budget (simple: € per type; detailed: cost components per type, with reset). The map zooms to the area whenever the centre, the radius or the Kreis selection changes. Advanced (collapsed): max points per site, spacing per type, points override per pick (in the results list), hide low-confidence candidates.
+- **Inputs:** strategy (Usage active; Coverage and Mix shown as planned), area (radius around a town from the search or a map click, + km; or one or more Landkreise from the list or by clicking the map), charger type, budget (simple: € per type; detailed: cost components per type, with reset). The map zooms to the area whenever the centre, the radius or the Kreis selection changes. Advanced (collapsed): how full a new site may get (Comfortable / Standard / Lean), minimum usage per site (hours per point per day, per type), max points per site, spacing per type, points override per pick (in the results list), low-confidence distance, hide low-confidence candidates.
 - **Optimizer (§9), per type, on every input change, on today's prediction:** keep candidates of the type in the area → rank by point-hours per day (occupancy × 2 × 24) → skip a candidate within the spacing distance of an earlier pick of the same type (default AC 500 m, DC 3 km) → size it (§5) → add its site cost if it fits the remaining budget; stop when no site fits. A candidate that doesn't fit is skipped and cheaper ones further down still get a chance.
-- **Sizing (§5):** try n = 2, 4, 6 … up to the cap (8 AC / 12 DC); occupancy at n points = occupancy × 2 / n; pick the smallest n whose looked-up share of full days is at or below the class target. The user can override n per pick.
+- **Sizing (§5):** try n = 2, 4, 6 … up to the cap (8 AC / 12 DC); occupancy at n points = occupancy × 2 / n; pick the smallest n whose looked-up share of full days is at or below the class target of the chosen occupancy level. The user can override n per pick. A pick whose hours per point per day at its size stay below the minimum usage is skipped.
 - **Site cost:** (grid connection + civil works + cost per point × n − subsidy €) × (1 − subsidy %).
 - **Outputs:** numbered picks on the map, each with a yellow badge showing its number of charging points; a ranked list per type with hours per point per day, site point-hours, points, site cost and the low-confidence tag; a budget summary per type with the picks' total demand today, 2030 and 2035.
 - **Pick popup (marker or list click):** number of points (with icons) and how often the site would be full; site demand today, 2030 and 2035 (point-hours per day and hours per point; 2030/2035 = today × Kreis factor, capped); site cost; why AC or DC; residents and destinations nearby; distance to the nearest station with usage data; low-confidence flag; and Google Street View next to it (the same keyless embed as `app/js/streetview.js`). The years never change the picks.
@@ -83,7 +83,7 @@ columns: [ id, lat, lon, kreis, type, occ, low_conf, feed_m, dc_reason,
 | `kreis` | int | index into `kreise` |
 | `type` | "AC" / "DC" | from the context rule (§6) |
 | `occ` | float 0–1 | **predicted mean occupancy per point at 2 points** (model output; synthetic here) |
-| `low_conf` | 0 / 1 | low-confidence flag (§7) |
+| `low_conf` | 0 / 1 | low-confidence flag at the default distance (§7); the page recomputes it from `feed_m` for the user's distance |
 | `feed_m` | int | metres to the nearest feed station |
 | `dc_reason` | string | `motorway`, `primary road`, `supermarket` or empty (AC) |
 | `residents_1km` | int | Zensus residents within 1 km |
@@ -109,6 +109,8 @@ size_steps: [2, 4, 6, 8, 10, 12]
 point_classes: ["2", "4", "6", "8", "10+"],  point_class_edges: [2.5, 4.5, 6.5, 8.5]
 occ_bin_edges: [0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 1.01]
 target_percentile: 0.75,  targets: { AC: 0.3089, DC: 0.0473 },  max_points: { AC: 8, DC: 12 }
+levels: { comfortable: 0.5, standard: 0.75, lean: 0.9 }
+targets_by_level: { comfortable: { AC, DC }, standard: { AC, DC }, lean: { AC, DC } }
 full_share:     { AC: [[...8 bins] x 5 point classes], DC: [...] }   # median share of full days
 station_counts: { AC: [...], DC: [...] }                              # stations per lookup cell
 ```
