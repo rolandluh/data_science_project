@@ -298,13 +298,13 @@ Each decision has a short *why* and, where relevant, *limits*.
 - *Why:* it exists only for feed stations, which favour big networks, so as "unmet demand" it would pull picks toward big-network areas; areas of small operators would look unsaturated only because we can't see them. There is also no clean conversion from "full on X% of days" to point-hours.
 - *Limits:* congestion at existing stations doesn't raise a nearby candidate's score directly; the competition features cover nearby supply only.
 
-✅ **Future scenarios: Today (default), 2030 and 2035.** Factor per Kreis = (StandortTOOL public demand in year Y ÷ 2026, Referenzszenario, dashboard download) ÷ (BW charging points in year Y ÷ 2026). Supply grows linearly by the 2023–25 average of points added per year from the register (~5,900 per year in BW). Site point-hours × factor, capped at the highest observed occupancy; sizing and site costs are recomputed per scenario (precomputed columns).
+✅ **Future scenarios: 2030 and 2035 are shown per site for the business case; they are not an input** (changed 23 Nov 2026 after the concept mock-up; before: a year switch that re-ran sizing, costs and the optimizer). Picks, sizing and site costs use today's prediction only. Each recommended site shows its demand today, in 2030 and in 2035. Factor per Kreis = (StandortTOOL public demand in year Y ÷ 2026, Referenzszenario, dashboard download) ÷ (BW charging points in year Y ÷ 2026). Supply grows linearly by the 2023–25 average of points added per year from the register (~5,900 per year in BW). Site point-hours × factor, capped at the highest observed occupancy, spread over the recommended points (mock-up: cap = 99th percentile, since the maximum is 100 %).
 - *Why:* our model can't forecast; NOW's demand rests on sales forecasts and a per-Kreis ramp-up we can't build. Supply additions have been roughly flat since 2022 while percentage growth fell (60% → 18%), so a linear trend fits better than compounding (2035: ×2.6 instead of ×4.4).
 - *Limits:* a scenario, not a forecast; the factor is the same for all sites in a Kreis; NOW's figures are being updated (Nov 2026); the register lacks closed points and recent months; usage behaviour is assumed to stay as in 2026. 2035 is labelled long-term.
 
 ✅ **One optimizer mode first (usage maximization). Accessibility and hybrid (λ slider) later.** Objective weights are a parameter.
 
-✅ **Energy and returns are computed after prediction from documented cost and value assumptions** (cost list: `todos.md`). They are shown per site as labelled estimates and are not used to choose between AC and DC. The same cost assumptions decide how many sites fit each budget.
+✅ **Energy and returns are not shown in v1** (changed 23 Nov 2026 after the concept mock-up; before: shown per site as labelled estimates). They would rest on assumed charging power, prices and running costs rather than on the model. The cost assumptions (cost list: `todos.md`) still decide site costs and how many sites fit each budget.
 
 ---
 
