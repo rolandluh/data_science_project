@@ -42,6 +42,7 @@ ROAD_SEARCH_M = 5000  # distances to major roads are capped here
 
 SYNTHETIC_SEED = 2026
 SYNTHETIC_NOISE = 0.6  # standard deviation of the noise, in z-score units
+SYNTHETIC_SHRINK = 0.6  # pull values toward the class mean, as RandomForest predictions are compressed (1 = no shrink)
 SYNTHETIC_WEIGHTS = {  # weights on z-scored features, per class
     "AC": {"residents": 0.55, "destinations": 0.30, "road": 0.15, "motorway": 0.0},
     "DC": {"residents": 0.15, "destinations": 0.25, "road": 0.45, "motorway": 0.5},
@@ -171,7 +172,8 @@ def synthetic_occupancy(cls, residents, destinations, road, motorway, observed, 
     """SYNTHETIC prediction: weighted real features + noise, mapped onto the observed occupancy distribution of the class.
 
     The score's rank is turned into the matching quantile (1st to 99th percentile) of today's station occupancy,
-    so magnitudes are plausible and stay within the observed range. Not a model: a placeholder with the right shape.
+    so magnitudes are plausible and stay within the observed range, then shrunk toward the mean (SYNTHETIC_SHRINK) the way
+    RandomForest predictions are. Not a model: a placeholder with the right shape.
     """
     w = SYNTHETIC_WEIGHTS[cls]
     score = (w["residents"] * zscore(np.log1p(residents)) + w["destinations"] * zscore(np.log1p(destinations))
@@ -179,7 +181,8 @@ def synthetic_occupancy(cls, residents, destinations, road, motorway, observed, 
              + rng.normal(0, SYNTHETIC_NOISE, len(residents)))
     rank = (pd.Series(score).rank(method="first").to_numpy() - 0.5) / len(score)
     quantiles = 0.01 + 0.98 * rank
-    return np.quantile(observed, quantiles)
+    mapped = np.quantile(observed, quantiles)
+    return observed.mean() + SYNTHETIC_SHRINK * (mapped - observed.mean())
 
 
 def load_feature_inputs():
@@ -260,7 +263,8 @@ def save_candidates(inputs, kreise, stats, feed, out=OUT_DIR / "candidates.json"
                  "excluded_access": sorted(EXCLUDED_ACCESS),
                  "dc_rule_m": {"motorway": DC_MOTORWAY_M, "primary_road": DC_PRIMARY_M, "supermarket": DC_SUPERMARKET_M},
                  "low_confidence_m": LOW_CONFIDENCE_M,
-                 "synthetic_weights": SYNTHETIC_WEIGHTS, "synthetic_noise": SYNTHETIC_NOISE, "seed": SYNTHETIC_SEED},
+                 "synthetic_weights": SYNTHETIC_WEIGHTS, "synthetic_noise": SYNTHETIC_NOISE,
+                 "synthetic_shrink": SYNTHETIC_SHRINK, "seed": SYNTHETIC_SEED},
         "kreise": [{"ags": a, "name": n, "type": b} for a, n, b in kreise[["AGS", "GEN", "BEZ"]].itertuples(index=False)],
         "columns": ["id", "lat", "lon", "kreis", "type", "occ", "low_conf", "feed_m", "dc_reason",
                     "residents_1km", "destinations_500m", "major_road_m", "parking", "source"],
