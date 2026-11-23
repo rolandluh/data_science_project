@@ -2,7 +2,7 @@
 
 Usage: python src/mockup_data.py    ->  data/processed/mockup/*.json, then python src/serve.py -> /mockup/
 
-Each save_*() function skips if its output exists (delete a file, or the folder, to regenerate it).
+Each save_*() function skips if its output exists and matches DATA_VERSION (delete a file to regenerate it).
 Real: candidates (public parking), Kreis, AC/DC context rule, distance to the nearest feed station, register stations,
 overused feed stations, sizing lookup table, supply trend.
 SYNTHETIC (placeholders until the demand model exists): predicted occupancy per candidate and per 500 m cell,
@@ -20,6 +20,10 @@ from sklearn.neighbors import KDTree
 
 PROCESSED = Path("data/processed")
 OUT_DIR = PROCESSED / "mockup"
+# Bump when a file's content or schema changes: files of an older version are regenerated, and the page refuses them
+DATA_VERSION = 2
+VG250_ZIP = Path("data/raw/vg250.zip")  # BKG boundaries, downloaded by src/extract.py (save_districts)
+VG250_TOWNS = "vg250_01-01.geo84.shape.ebenen/vg250_ebenen_0101/VG250_GEM.shp"
 METRIC_CRS = "EPSG:25832"  # metres, for all distances
 
 # ---------------------------------------------------------------------------
@@ -88,6 +92,27 @@ def write_json(path, payload):
     print(f"Saved {path} ({path.stat().st_size / 1e6:.1f} MB)")
 
 
+def is_current(path):
+    """True if the output exists and was written by this DATA_VERSION (older files are regenerated)."""
+    if not path.exists():
+        return False
+    try:
+        with open(path, encoding="utf-8") as f:
+            current = json.load(f).get("meta", {}).get("version") == DATA_VERSION
+    except (OSError, ValueError):
+        current = False
+    return current
+
+
+def skip(path):
+    if is_current(path):
+        print(f"{path} exists, skipping")
+        return True
+    if path.exists():
+        print(f"{path} is from an older version of this script, regenerating")
+    return False
+
+
 def require(path):
     if not path.exists():
         raise FileNotFoundError(f"{path} is missing. Run python src/extract.py first.")
@@ -96,6 +121,7 @@ def require(path):
 
 def meta(source, synthetic):
     return {
+        "version": DATA_VERSION,
         "generated": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "source": source,
         "synthetic": synthetic,
@@ -201,8 +227,7 @@ def load_feature_inputs():
 # ---------------------------------------------------------------------------
 def save_candidates(inputs, kreise, stats, feed, out=OUT_DIR / "candidates.json"):
     """Public parking candidates with Kreis, AC/DC context rule, low-confidence flag and SYNTHETIC occupancy."""
-    if out.exists():
-        print(f"{out} exists, skipping")
+    if skip(out):
         return
     parking = gpd.read_file(require(PROCESSED / "parkplaetze_kombiniert_bw.geojson"), columns=["access", "parking", "name", "source"])
     parking = parking[~parking["access"].isin(EXCLUDED_ACCESS) & parking.geometry.notna()].copy()
@@ -267,8 +292,7 @@ def save_candidates(inputs, kreise, stats, feed, out=OUT_DIR / "candidates.json"
 
 def save_cells(inputs, stats, out=OUT_DIR / "cells.json"):
     """500 m cells (Zensus positions) with SYNTHETIC expected occupancy of a typical AC station there."""
-    if out.exists():
-        print(f"{out} exists, skipping")
+    if skip(out):
         return
     cells = inputs["cell_points"]
     residents, destinations, road = features_for(cells, inputs["cell_xy"], inputs["pop"][:, 2], inputs["poi_tree"], inputs["roads"])
@@ -282,8 +306,7 @@ def save_cells(inputs, stats, out=OUT_DIR / "cells.json"):
 
 def save_stations(out=OUT_DIR / "stations.json"):
     """Existing register stations (real), compact."""
-    if out.exists():
-        print(f"{out} exists, skipping")
+    if skip(out):
         return
     register = json.load(open(require(PROCESSED / "ladesaeulen.json"), encoding="utf-8"))
     col = {name: i for i, name in enumerate(register["columns"])}
@@ -302,8 +325,7 @@ def save_stations(out=OUT_DIR / "stations.json"):
 
 def save_overused(stats, feed, targets, out=OUT_DIR / "overused.json"):
     """Feed stations with their share of full days (real); overused = above the target of their class."""
-    if out.exists():
-        print(f"{out} exists, skipping")
+    if skip(out):
         return
     located = stats.join(feed.set_index("id")[["geometry"]], how="inner")
     rows = [[sid, round(g.y, 5), round(g.x, 5), c, round(float(share), 4), round(float(occ), 4), int(days), int(share > targets[c]),
@@ -338,8 +360,7 @@ def sizing_table(stats):
 
 
 def save_sizing(stats, targets, out=OUT_DIR / "sizing.json"):
-    if out.exists():
-        print(f"{out} exists, skipping")
+    if skip(out):
         return
     table, counts = sizing_table(stats)
     write_json(out, {
@@ -375,8 +396,7 @@ def supply_trend():
 
 def save_scenarios(kreise, stats, out=OUT_DIR / "scenarios.json"):
     """Kreis factors for 2030 / 2035 (SYNTHETIC), occupancy cap and supply trend (real)."""
-    if out.exists():
-        print(f"{out} exists, skipping")
+    if skip(out):
         return
     rng = np.random.default_rng(SYNTHETIC_SEED + 2)
     f2030 = 0.9 + 0.45 * rng.random(len(kreise))
@@ -394,29 +414,28 @@ def save_scenarios(kreise, stats, out=OUT_DIR / "scenarios.json"):
 
 
 def save_defaults(out=OUT_DIR / "defaults.json"):
-    if out.exists():
-        print(f"{out} exists, skipping")
+    if skip(out):
         return
     write_json(out, {"meta": meta("assumed placeholders in src/mockup_data.py", synthetic=["budget_eur", "cost"]), **DEFAULTS})
 
 
 def save_places(out=OUT_DIR / "places.json"):
     """Municipality names and centres (real) for the place search that sets the radius centre."""
-    if out.exists():
-        print(f"{out} exists, skipping")
+    if skip(out):
         return
-    towns = gpd.read_file(require(PROCESSED / "gemeinden_ev.geojson"))[["AGS", "GEN", "geometry"]]
-    towns = towns[towns["AGS"].str.startswith("08")].copy()
+    towns = gpd.read_file(f"/vsizip/{require(VG250_ZIP).as_posix()}/{VG250_TOWNS}", encoding="utf-8")
+    towns = towns[towns["AGS"].str.startswith("08") & (towns["GF"] == 4)]  # GF 4 = land area with structure
+    towns = towns.dissolve(by="AGS", aggfunc="first").reset_index()[["AGS", "GEN", "geometry"]]
     centre = towns.to_crs(METRIC_CRS).geometry.representative_point().to_crs("EPSG:4326")
     rows = sorted([name, ags[:5], round(p.y, 5), round(p.x, 5)] for name, ags, p in zip(towns["GEN"], towns["AGS"], centre))
-    write_json(out, {"meta": meta("gemeinden_ev.geojson (BKG municipality boundaries)", synthetic=[]),
+    write_json(out, {"meta": meta("BKG VG250 municipalities (data/raw/vg250.zip)", synthetic=[]),
                      "columns": ["name", "kreis_ags", "lat", "lon"], "rows": rows})
 
 
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     names = ["candidates", "cells", "stations", "overused", "sizing", "scenarios", "defaults", "places"]
-    if all((OUT_DIR / f"{n}.json").exists() for n in names):
+    if all(is_current(OUT_DIR / f"{n}.json") for n in names):
         print(f"All mock-up files exist in {OUT_DIR}; delete one to regenerate it")
         return
     save_stations()
@@ -430,7 +449,7 @@ def main():
     save_scenarios(kreise, stats)
     feed = feed_locations()
     save_overused(stats, feed, targets)
-    if not ((OUT_DIR / "candidates.json").exists() and (OUT_DIR / "cells.json").exists()):
+    if not (is_current(OUT_DIR / "candidates.json") and is_current(OUT_DIR / "cells.json")):
         inputs = load_feature_inputs()
         save_cells(inputs, stats)
         save_candidates(inputs, kreise, stats, feed)
