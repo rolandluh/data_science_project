@@ -71,20 +71,13 @@ YEARS = [2030, 2035]
 # Placeholder defaults (ASSUMED, not researched; the cost list in todos.md will replace them)
 DEFAULTS = {
     "status": "assumed placeholders, not researched",
-    "budget_eur": {"AC": 500_000, "DC": 2_000_000},
+    "budget_eur": {"AC": 500_000, "DC": 2_000_000},  # shown as input placeholders only; inputs start empty
     "cost": {
-        "AC": {"per_point": 6_000, "grid_per_site": 8_000, "civil_per_site": 6_000, "subsidy_per_site": 0, "om_per_point_year": 400},
-        "DC": {"per_point": 55_000, "grid_per_site": 60_000, "civil_per_site": 20_000, "subsidy_per_site": 0, "om_per_point_year": 3_000},
-    },
-    "value": {
-        "AC": {"delivered_kw": 7, "price_eur_kwh": 0.49, "energy_cost_eur_kwh": 0.25},
-        "DC": {"delivered_kw": 60, "price_eur_kwh": 0.59, "energy_cost_eur_kwh": 0.25},
-        "lifetime_years": 10,
-        "discount_rate": 0.06,
+        "AC": {"per_point": 6_000, "grid_per_site": 8_000, "civil_per_site": 6_000, "subsidy_per_site": 0, "subsidy_pct": 0},
+        "DC": {"per_point": 55_000, "grid_per_site": 60_000, "civil_per_site": 20_000, "subsidy_per_site": 0, "subsidy_pct": 0},
     },
     "spacing_m": {"AC": 500, "DC": 3000},
     "max_points": MAX_POINTS,
-    "area": {"mode": "radius", "center": [48.7758, 9.1829], "radius_km": 15},
 }
 
 
@@ -404,17 +397,31 @@ def save_defaults(out=OUT_DIR / "defaults.json"):
     if out.exists():
         print(f"{out} exists, skipping")
         return
-    write_json(out, {"meta": meta("assumed placeholders in src/mockup_data.py", synthetic=["budget_eur", "cost", "value"]), **DEFAULTS})
+    write_json(out, {"meta": meta("assumed placeholders in src/mockup_data.py", synthetic=["budget_eur", "cost"]), **DEFAULTS})
+
+
+def save_places(out=OUT_DIR / "places.json"):
+    """Municipality names and centres (real) for the place search that sets the radius centre."""
+    if out.exists():
+        print(f"{out} exists, skipping")
+        return
+    towns = gpd.read_file(require(PROCESSED / "gemeinden_ev.geojson"))[["AGS", "GEN", "geometry"]]
+    towns = towns[towns["AGS"].str.startswith("08")].copy()
+    centre = towns.to_crs(METRIC_CRS).geometry.representative_point().to_crs("EPSG:4326")
+    rows = sorted([name, ags[:5], round(p.y, 5), round(p.x, 5)] for name, ags, p in zip(towns["GEN"], towns["AGS"], centre))
+    write_json(out, {"meta": meta("gemeinden_ev.geojson (BKG municipality boundaries)", synthetic=[]),
+                     "columns": ["name", "kreis_ags", "lat", "lon"], "rows": rows})
 
 
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    names = ["candidates", "cells", "stations", "overused", "sizing", "scenarios", "defaults"]
+    names = ["candidates", "cells", "stations", "overused", "sizing", "scenarios", "defaults", "places"]
     if all((OUT_DIR / f"{n}.json").exists() for n in names):
         print(f"All mock-up files exist in {OUT_DIR}; delete one to regenerate it")
         return
     save_stations()
     save_defaults()
+    save_places()
     kreise = load_kreise()
     stats = station_stats()
     targets = {c: round(float(stats.loc[stats["cls"] == c, "full_share"].quantile(TARGET_PERCENTILE)), 4) for c in ("AC", "DC")}
