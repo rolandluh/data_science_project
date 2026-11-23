@@ -1,0 +1,156 @@
+{
+  "_note": "Info-point texts of the concept mock-up. Keys are referenced by data-info attributes in index.html and by mockup.js. Each entry: title, text (2-3 plain sentences on how the real product does it), ref (decision record section, notes and concepts/demand_estimation_v1.md).",
+
+  "banner": {
+    "title": "What is real, what is synthetic",
+    "text": "Candidate sites, Kreise, existing and overused stations, the sizing table and the supply trend come from our processed data. The predicted occupancy, the 2030/2035 Kreis factors and the cost defaults are made up so the concept can be shown before the model exists. The app reads fixed files, so the real model only has to write the same files.",
+    "ref": "README in mockup/"
+  },
+
+  "strategy": {
+    "title": "Strategy",
+    "text": "v1 maximizes predicted usage: the busiest sites that fit the budget. Coverage (serve under-supplied residents) and a mix of both with a weight slider are planned for later.",
+    "ref": "Decision record §9 (one optimizer mode first)"
+  },
+  "area": {
+    "title": "Area of examination",
+    "text": "Only candidates inside the area can be picked. In the real product, features, competition and spacing still use all of Baden-Württemberg, so stations just outside the border count.",
+    "ref": "user_input.md #1"
+  },
+  "area_radius": {
+    "title": "Radius",
+    "text": "Click the map to move the centre and set the radius in km. A candidate is inside if its straight-line distance to the centre is at most the radius.",
+    "ref": "user_input.md #1"
+  },
+  "area_kreis": {
+    "title": "Landkreise",
+    "text": "Pick one or more Landkreise or Stadtkreise (BKG VG250 boundaries). Every candidate is assigned to the Kreis it lies in. You can also click a Kreis on the map to add or remove it.",
+    "ref": "user_input.md #1"
+  },
+  "charger_type": {
+    "title": "Charger type",
+    "text": "Choose AC only, DC only or both. Every candidate already has a type from the context rule: motorway services or junctions, primary roads and supermarkets become DC, everything else AC. So 'DC only' can only pick those spots.",
+    "ref": "Decision record §6"
+  },
+  "budget": {
+    "title": "Budget",
+    "text": "One euro budget for AC and one for DC, because CPOs choose their AC/DC mix as a business decision and occupancy is not comparable between the two. The optimizer fills each budget separately; AC and DC are never ranked against each other.",
+    "ref": "Decision record §1, §9"
+  },
+  "budget_detailed": {
+    "title": "Cost components",
+    "text": "Site cost = per-site costs (grid connection, civil works, minus subsidy) + cost per point × number of points from sizing. Operation and maintenance only enters the returns estimate, not the budget. The defaults here are placeholders; the real ones come from the cost list in todos.md.",
+    "ref": "user_input.md (detailed budget), §9"
+  },
+  "year": {
+    "title": "Scenario year",
+    "text": "Today uses the model's prediction at 2026 levels. For 2030 and 2035 each site's point-hours are multiplied by its Kreis factor (public demand growth ÷ supply growth, StandortTOOL Referenzszenario and the register trend of ~5,900 new points per year), capped at today's highest occupancy. Sizing, costs and the optimizer then run again. In the mock-up the factors are synthetic.",
+    "ref": "Decision record §9 (future scenarios)"
+  },
+
+  "adv_max_points": {
+    "title": "Max points per site",
+    "text": "Caps the sizing rule. Without a cap, a very busy predicted site would get more points than any real site of its kind.",
+    "ref": "Decision record §5 step 5"
+  },
+  "adv_spacing": {
+    "title": "Minimum spacing between picks",
+    "text": "Predictions are independent, so three spots 100 m apart could all be picked and count the same demand three times. A candidate is skipped if an earlier pick of the same type lies closer than this distance. The values are judgement; a distance-decay rule is planned.",
+    "ref": "Decision record §9 (spacing rule), §12"
+  },
+  "adv_value": {
+    "title": "Value assumptions",
+    "text": "Energy = occupied point-hours × average delivered power. Returns = energy × (price − energy cost) − operation and maintenance, discounted over the lifetime. They are display-only estimates and never decide what is picked.",
+    "ref": "Decision record §3 (energy), §9"
+  },
+  "adv_hide_low": {
+    "title": "Hide low-confidence candidates",
+    "text": "Removes candidates with the 'Low confidence' flag before optimizing, so only sites near today's observed stations can be picked.",
+    "ref": "user_input.md (advanced), §7"
+  },
+
+  "optimizer": {
+    "title": "How the picks are made",
+    "text": "Per type: keep the candidates in the area, rank them by predicted point-hours per day (occupancy × 2 points × 24 h), skip any within the spacing distance of an earlier pick, and add each site's cost until the budget is used. It is a simple greedy rule, not a proven optimum, and it maximizes usage, not usage per euro.",
+    "ref": "Decision record §9 (objective, spacing rule)"
+  },
+  "limits": {
+    "title": "Limits",
+    "items": [
+      "The live feed covers only about half of public charging points, mostly big networks and fast charging; usage of the rest is unseen.",
+      "Occupancy is not demand: overnight AC looks busy, and AC and DC are not comparable.",
+      "Price, the strongest usage driver, is missing.",
+      "2030 and 2035 are scenarios from one factor per Kreis, not forecasts.",
+      "Picks tend to lie in gaps far from today's stations, where predictions are least certain.",
+      "The optimizer is deliberately simple (greedy, hard spacing) and not validated yet."
+    ],
+    "ref": "demand_limitations_v1.md (H1–H5, M6), optimization_limitations_v1.md"
+  },
+  "budget_summary": {
+    "title": "Budget summary",
+    "text": "How much of each budget the picks use and what is left. A remainder is normal: the next-best site no longer fits, and the optimizer then tries cheaper (smaller) sites further down the ranking.",
+    "ref": "Decision record §9"
+  },
+
+  "picks": {
+    "title": "Recommended sites",
+    "text": "Ranked by predicted point-hours per day within their type. Candidates are public parking sites (OpenStreetMap and MobiData BW). Click a row to show it on the map.",
+    "ref": "Decision record §9"
+  },
+  "hours_per_point": {
+    "title": "Hours per point per day",
+    "text": "The model predicts mean occupancy per point (the share of the day a point is in use) at a reference size of 2 points. Shown as hours: 0.15 → 3.6 h per point per day. After sizing, the same site demand is spread over the recommended number of points.",
+    "ref": "Decision record §3, §5"
+  },
+  "points": {
+    "title": "Number of points (sizing rule)",
+    "text": "The smallest point count whose site would be full (a whole hour with every point busy) no more often than 3 in 4 of today's stations of its type: about 31 % of days for AC, 5 % for DC. The share comes from a lookup table of today's stations. You can override it per pick.",
+    "ref": "Decision record §5"
+  },
+  "site_cost": {
+    "title": "Site cost",
+    "text": "Per-site costs (grid connection, civil works, minus subsidy) plus the cost per point times the number of points. It is what the pick takes from its budget.",
+    "ref": "Decision record §9"
+  },
+  "confidence": {
+    "title": "Low confidence",
+    "text": "Few charging stations like this one exist nearby, so this estimate is less reliable. The real flag combines the distance to the nearest training site (threshold from the error-vs-distance plot) with features outside the training range; the mock-up uses distance to the nearest feed station > 2 km.",
+    "ref": "Decision record §7"
+  },
+  "energy": {
+    "title": "Energy (estimate)",
+    "text": "Occupied point-hours per day × assumed delivered kW × 365. Energy is not a model target because it is not observed; it is a labelled conversion.",
+    "ref": "Decision record §3"
+  },
+  "returns": {
+    "title": "Returns (estimate)",
+    "text": "Yearly margin = energy × (price − energy cost) − operation and maintenance; net present value over the lifetime at the discount rate, minus the site cost. Shown for orientation only; it never decides the picks.",
+    "ref": "Decision record §9 (energy and returns)"
+  },
+  "dc_reason": {
+    "title": "Why AC or DC",
+    "text": "The context rule: within 300 m of motorway services, rest areas or junctions, within 25 m of a primary road, or within 100 m of a supermarket → DC; otherwise AC. No exact kW in v1.",
+    "ref": "Decision record §6"
+  },
+
+  "layer_candidates": {
+    "title": "Candidate sites",
+    "text": "All public parking sites in the area (private, permit-only and closed parking excluded), coloured by their AC/DC type from the context rule. Only these can be picked.",
+    "ref": "Decision record §9 (~117k public parking candidates)"
+  },
+  "layer_usage": {
+    "title": "Expected usage (500 m cells)",
+    "text": "Expected occupancy of a typical station in each 500 m cell, shown as hours per point per day. It is a map layer for orientation, not an optimizer input. In the mock-up the values are synthetic.",
+    "ref": "Decision record §9"
+  },
+  "layer_overused": {
+    "title": "Overused stations",
+    "text": "Live-feed stations that had a fully occupied hour on more days than 3 in 4 of their peers (AC > 31 %, DC > 5 % of days), from at least 14 valid days. Used for sizing and as context, not as an optimizer input, because the feed favours big networks.",
+    "ref": "Decision record §5, §9"
+  },
+  "layer_stations": {
+    "title": "Existing stations",
+    "text": "All Baden-Württemberg charging stations in the Bundesnetzagentur register (1 Sep 2026). The real model uses them as competition features (points and kW within 0.5, 1 and 5 km).",
+    "ref": "Decision record §4"
+  }
+}
