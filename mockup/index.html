@@ -45,7 +45,7 @@
 
   <div class="mock-banner" role="note">
     <strong>Concept mock-up: predictions are synthetic</strong>
-    <span class="mock-banner-sub">Real data: candidates, Kreise, stations, sizing table, supply trend. Synthetic: occupancy, 2030/2035 factors, costs.</span>
+    <span class="mock-banner-sub">Real data: candidates, Kreise, stations, sizing table, supply trend. Synthetic: predicted demand, 2030/2035 factors, costs.</span>
     <button class="info" type="button" data-info="banner" aria-label="What is real and what is synthetic">i</button>
   </div>
 
@@ -74,15 +74,21 @@
           <h3 class="input-title">Area <button class="info" type="button" data-info="area" aria-label="About the area">i</button></h3>
           <fieldset class="segmented" aria-label="Area type">
             <legend class="visually-hidden">Area type</legend>
-            <label><input type="radio" name="area-mode" value="radius" checked><span>Radius</span></label>
+            <label><input type="radio" name="area-mode" value="radius"><span>Radius</span></label>
             <label><input type="radio" name="area-mode" value="kreis"><span>Landkreise</span></label>
           </fieldset>
-          <div id="area-radius" class="area-pane">
-            <div class="field-row">
-              <label class="field grow" for="radius">Radius (km) <button class="info" type="button" data-info="area_radius" aria-label="About the radius">i</button></label>
-              <input id="radius" class="num-input" type="number" min="1" max="100" step="1" value="15">
+          <p id="area-hint" class="hint">Choose a radius around a place or one or more Landkreise.</p>
+          <div id="area-radius" class="area-pane" hidden>
+            <div class="field">
+              <span class="field-label">Centre <button class="info" type="button" data-info="area_radius" aria-label="About the radius">i</button></span>
+              <input id="place" type="text" list="place-list" placeholder="Town, or click the map" autocomplete="off" spellcheck="false" aria-label="Centre: town name">
+              <datalist id="place-list"></datalist>
             </div>
-            <p class="hint">Click the map to move the centre. <span id="center-label"></span></p>
+            <div class="field-row">
+              <label class="field grow" for="radius">Radius (km)</label>
+              <input id="radius" class="num-input" type="number" min="1" max="100" step="1" placeholder="e.g. 15">
+            </div>
+            <p class="hint" id="center-label">No centre yet.</p>
           </div>
           <div id="area-kreis" class="area-pane" hidden>
             <div class="field">
@@ -100,7 +106,7 @@
             <legend class="visually-hidden">Charger type</legend>
             <label><input type="radio" name="charger" value="ac"><span>AC</span></label>
             <label><input type="radio" name="charger" value="dc"><span>DC</span></label>
-            <label><input type="radio" name="charger" value="both" checked><span>Both</span></label>
+            <label><input type="radio" name="charger" value="both"><span>Both</span></label>
           </fieldset>
         </section>
 
@@ -111,13 +117,14 @@
             <label><input type="radio" name="budget-mode" value="simple" checked><span>Simple</span></label>
             <label><input type="radio" name="budget-mode" value="detailed"><span>Detailed</span></label>
           </fieldset>
+          <p id="budget-hint" class="hint">Choose a charger type first.</p>
           <div class="field-row" data-type="AC">
             <label class="field grow" for="budget-AC"><span class="type-dot ac"></span>AC budget (€)</label>
-            <input id="budget-AC" class="num-input wide" type="number" min="0" step="50000">
+            <input id="budget-AC" class="num-input wide" type="number" min="0" step="50000" placeholder="e.g. 500000">
           </div>
           <div class="field-row" data-type="DC">
             <label class="field grow" for="budget-DC"><span class="type-dot dc"></span>DC budget (€)</label>
-            <input id="budget-DC" class="num-input wide" type="number" min="0" step="100000">
+            <input id="budget-DC" class="num-input wide" type="number" min="0" step="100000" placeholder="e.g. 2000000">
           </div>
           <div id="cost-detail" hidden>
             <p class="subhead">Cost components <span class="tag-assumed">assumed</span> <button class="info" type="button" data-info="budget_detailed" aria-label="About cost components">i</button></p>
@@ -127,17 +134,6 @@
             </table>
             <button id="cost-reset" class="btn-ghost small" type="button">Reset to defaults</button>
           </div>
-        </section>
-
-        <section class="input-block">
-          <h3 class="input-title">Year <button class="info" type="button" data-info="year" aria-label="About the scenario year">i</button></h3>
-          <fieldset class="segmented" aria-label="Scenario year">
-            <legend class="visually-hidden">Scenario year</legend>
-            <label><input type="radio" name="year" value="today" checked><span>Today</span></label>
-            <label><input type="radio" name="year" value="2030"><span>2030</span></label>
-            <label><input type="radio" name="year" value="2035"><span>2035</span></label>
-          </fieldset>
-          <p id="year-note" class="hint"></p>
         </section>
 
         <details class="input-block advanced">
@@ -160,17 +156,6 @@
             <p class="subhead">Points per pick <button class="info" type="button" data-info="points" aria-label="About points per pick">i</button></p>
             <p class="hint">Override the number of points in the results list. <span id="override-count"></span></p>
             <button id="override-reset" class="btn-ghost small" type="button" disabled>Clear overrides</button>
-          </div>
-          <div class="adv-group">
-            <p class="subhead">Value assumptions <span class="tag-assumed">assumed</span> <button class="info" type="button" data-info="adv_value" aria-label="About value assumptions">i</button></p>
-            <table class="cost-table">
-              <thead><tr><th scope="col"></th><th scope="col" data-type="AC">AC</th><th scope="col" data-type="DC">DC</th></tr></thead>
-              <tbody id="value-body"></tbody>
-            </table>
-            <div class="pair">
-              <label class="field">Lifetime (years) <input id="value-lifetime" type="number" min="1" max="40" step="1"></label>
-              <label class="field">Discount rate (%) <input id="value-rate" type="number" min="0" max="30" step="0.5"></label>
-            </div>
           </div>
           <label class="layer-row">
             <span class="layer-text"><span class="layer-name">Hide low-confidence candidates <button class="info" type="button" data-info="adv_hide_low" aria-label="About hiding low-confidence candidates">i</button></span></span>
@@ -197,7 +182,7 @@
         </label>
         <label class="layer-row compact" data-layer="usage">
           <span class="layer-text"><span class="layer-name">Expected usage <span class="tag-synthetic">synthetic</span> <button class="info" type="button" data-info="layer_usage" aria-label="About expected usage">i</button></span></span>
-          <span class="switch"><input id="layer-usage" type="checkbox" checked><span class="knob"></span></span>
+          <span class="switch"><input id="layer-usage" type="checkbox"><span class="knob"></span></span>
         </label>
         <label class="layer-row compact" data-layer="overused">
           <span class="layer-text"><span class="layer-name">Overused stations <button class="info" type="button" data-info="layer_overused" aria-label="About overused stations">i</button></span></span>
@@ -230,11 +215,12 @@
         </div>
       </div>
       <div class="results-scroll">
-        <section class="summary-block">
+        <section id="start" class="start-block" aria-live="polite"></section>
+        <section class="summary-block" id="summary-block">
           <h3 class="input-title">Budget summary <button class="info" type="button" data-info="budget_summary" aria-label="About the budget summary">i</button></h3>
           <div id="summary" class="summary-grid"></div>
         </section>
-        <section class="picks-block">
+        <section class="picks-block" id="picks-block">
           <div class="picks-head">
             <h3 class="input-title">Recommended sites <button class="info" type="button" data-info="picks" aria-label="About recommended sites">i</button></h3>
             <fieldset id="picks-tabs" class="segmented small" aria-label="Show picks of type">

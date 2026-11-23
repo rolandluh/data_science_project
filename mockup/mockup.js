@@ -7,19 +7,15 @@ import { loadJSON, toast } from "../app/js/status.js";
 
 const DATA = "../data/processed/mockup/";
 const LOAD_ID = Date.now();
-const FILES = ["candidates", "cells", "stations", "overused", "sizing", "scenarios", "defaults"];
+const FILES = ["candidates", "cells", "stations", "overused", "sizing", "scenarios", "defaults", "places"];
 const TYPES = ["AC", "DC"];
+const YEARS = ["2030", "2035"];
 const COST_ROWS = [
-  ["per_point", "Hardware + install per point"],
-  ["grid_per_site", "Grid connection per site"],
-  ["civil_per_site", "Civil works per site"],
-  ["subsidy_per_site", "Subsidy per site (deducted)"],
-  ["om_per_point_year", "O&M per point per year"],
-];
-const VALUE_ROWS = [
-  ["delivered_kw", "Delivered kW while occupied", 1],
-  ["price_eur_kwh", "Price €/kWh", 0.01],
-  ["energy_cost_eur_kwh", "Energy cost €/kWh", 0.01],
+  ["per_point", "Hardware + install per point (€)", 500],
+  ["grid_per_site", "Grid connection per site (€)", 500],
+  ["civil_per_site", "Civil works per site (€)", 500],
+  ["subsidy_per_site", "Subsidy per site (€, deducted)", 500],
+  ["subsidy_pct", "Subsidy (% of site cost)", 1],
 ];
 const USAGE_BREAKS = [1.5, 2, 3, 4, 5, 7]; // hours per point per day
 const USAGE_COLORS = ["#fff7ec", "#fee8c8", "#fdd49e", "#fdbb84", "#fc8d59", "#e34a33", "#b30000"];
@@ -98,16 +94,15 @@ function openPopover(button) {
   popoverOwner = button;
   button.setAttribute("aria-expanded", "true");
   byId("popover-title").textContent = entry.title;
-  const body = entry.items
+  byId("popover-body").innerHTML = entry.items
     ? `<ul>${entry.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`
     : `<p>${escapeHtml(entry.text)}</p>`;
-  byId("popover-body").innerHTML = body;
   byId("popover-ref").textContent = entry.ref ? `Reference: ${entry.ref}` : "";
   popover.hidden = false;
   const rect = button.getBoundingClientRect();
   const width = popover.offsetWidth;
   const height = popover.offsetHeight;
-  let left = Math.min(Math.max(8, rect.left - 12), window.innerWidth - width - 8);
+  const left = Math.min(Math.max(8, rect.left - 12), window.innerWidth - width - 8);
   let top = rect.bottom + 8;
   if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 8);
   popover.style.left = `${left}px`;
@@ -175,6 +170,8 @@ const markers = new Map(); // candidate id -> pick marker
 let D = null; // all loaded files
 let C = null; // candidates as typed arrays
 let kreisFeatures = []; // index-aligned with D.candidates.kreise
+let factors = null; // { "2030": Float32Array per Kreis index, "2035": ... }
+const places = new Map(); // datalist label -> [lat, lon]
 
 function fatal(message) {
   byId("fatal-text").innerHTML = message;
@@ -214,7 +211,6 @@ function prepareCandidates() {
     kreis: new Uint8Array(n),
     type: new Uint8Array(n), // 0 AC, 1 DC
     low: new Uint8Array(n),
-    score: new Float32Array(n), // scratch: scenario occupancy at 2 points
   };
   rows.forEach((row, i) => {
     arrays.lat[i] = row[col.lat];
@@ -227,35 +223,79 @@ function prepareCandidates() {
   return arrays;
 }
 
+function prepareFactors() {
+  factors = {};
+  YEARS.forEach((year) => {
+    factors[year] = Float32Array.from(D.candidates.kreise, (k) => (D.scenarios.factors[k.ags] || {})[year] || 1);
+  });
+}
+
+function preparePlaces() {
+  const { columns, rows } = D.places;
+  const col = Object.fromEntries(columns.map((name, i) => [name, i]));
+  const kreisName = Object.fromEntries(D.candidates.kreise.map((k) => [k.ags, k.name]));
+  const counts = {};
+  rows.forEach((row) => { counts[row[col.name]] = (counts[row[col.name]] || 0) + 1; });
+  rows.forEach((row) => {
+    const name = row[col.name];
+    // Towns with the same name get their Kreis added
+    const label = counts[name] > 1 ? `${name} (${kreisName[row[col.kreis_ags]] || row[col.kreis_ags]})` : name;
+    places.set(label.toLowerCase(), { label, latlng: [row[col.lat], row[col.lon]] });
+  });
+  byId("place-list").innerHTML = [...places.values()].map((p) => `<option value="${escapeHtml(p.label)}"></option>`).join("");
+}
+
 // ---------------------------------------------------------------------------
-// State and inputs
+// State and inputs (everything starts empty; Advanced and cost components start at their defaults)
 // ---------------------------------------------------------------------------
 const state = {
-  areaMode: "radius",
-  center: [48.7758, 9.1829],
-  radiusKm: 15,
+  areaMode: null, // "radius" | "kreis"
+  center: null, // [lat, lon]
+  radiusKm: null,
   kreise: new Set(),
-  charger: "both",
+  charger: null, // "ac" | "dc" | "both"
   budgetMode: "simple",
-  budget: { AC: 0, DC: 0 },
+  budget: { AC: null, DC: null },
   cost: null,
-  value: null,
-  year: "today",
   maxPts: { AC: 8, DC: 12 },
   spacing: { AC: 500, DC: 3000 },
   hideLow: false,
   overrides: new Map(), // candidate id -> points
   tab: "AC",
   active: null, // selected pick id
+  fitPending: false, // zoom to the area after the next run
 };
 
-const activeTypes = () => (state.charger === "both" ? TYPES : [state.charger.toUpperCase()]);
+const activeTypes = () => (!state.charger ? [] : state.charger === "both" ? TYPES : [state.charger.toUpperCase()]);
 const costFor = (type) => (state.budgetMode === "detailed" ? state.cost[type] : D.defaults.cost[type]);
-const radioValue = (name) => document.querySelector(`input[name="${name}"]:checked`).value;
-const numberOf = (input, fallback) => {
-  const value = Number(input.value);
-  return input.value === "" || !Number.isFinite(value) ? fallback : value;
+const radioValue = (name) => {
+  const checked = document.querySelector(`input[name="${name}"]:checked`);
+  return checked ? checked.value : null;
 };
+const numberOrNull = (input) => {
+  const value = Number(input.value);
+  return input.value.trim() === "" || !Number.isFinite(value) ? null : value;
+};
+const numberOf = (input, fallback) => numberOrNull(input) ?? fallback;
+
+function areaComplete() {
+  if (state.areaMode === "radius") return Boolean(state.center && state.radiusKm > 0);
+  if (state.areaMode === "kreis") return state.kreise.size > 0;
+  return false;
+}
+
+// What is still missing before the optimizer can run (shown as a checklist)
+function missingInputs() {
+  const steps = [];
+  steps.push({ label: "Area", done: areaComplete(),
+    hint: !state.areaMode ? "choose Radius or Landkreise" :
+      state.areaMode === "radius" ? (!state.center ? "set a centre (town or map click)" : "enter a radius in km") : "pick at least one Landkreis" });
+  steps.push({ label: "Charger type", done: activeTypes().length > 0, hint: "AC, DC or both" });
+  const budgetsDone = activeTypes().length > 0 && activeTypes().every((t) => state.budget[t] > 0);
+  steps.push({ label: "Budget", done: budgetsDone,
+    hint: activeTypes().length ? `enter the ${activeTypes().filter((t) => !(state.budget[t] > 0)).join(" and ")} budget` : "after the charger type" });
+  return steps;
+}
 
 let timer = null;
 function schedule() {
@@ -263,17 +303,12 @@ function schedule() {
   timer = setTimeout(run, RUN_DELAY_MS);
 }
 
-function buildCostTables() {
-  const costBody = byId("cost-body");
-  costBody.innerHTML = COST_ROWS.map(([key, label]) =>
+function buildCostTable() {
+  byId("cost-body").innerHTML = COST_ROWS.map(([key, label, step]) =>
     `<tr><th scope="row">${label}</th>${TYPES.map((t) =>
-      `<td data-type="${t}"><input type="number" min="0" step="500" data-cost="${t}.${key}" aria-label="${t} ${label}"></td>`).join("")}</tr>`).join("");
-  const valueBody = byId("value-body");
-  valueBody.innerHTML = VALUE_ROWS.map(([key, label, step]) =>
-    `<tr><th scope="row">${label}</th>${TYPES.map((t) =>
-      `<td data-type="${t}"><input type="number" min="0" step="${step}" data-value="${t}.${key}" aria-label="${t} ${label}"></td>`).join("")}</tr>`).join("");
+      `<td data-type="${t}"><input type="number" min="0" step="${step}" data-cost="${t}.${key}" aria-label="${t} ${label}"></td>`).join("")}</tr>`).join("");
   fillCostInputs();
-  document.querySelectorAll("[data-cost], [data-value]").forEach((input) => input.addEventListener("input", readInputs));
+  document.querySelectorAll("[data-cost]").forEach((input) => input.addEventListener("input", readInputs));
 }
 
 function fillCostInputs() {
@@ -281,12 +316,6 @@ function fillCostInputs() {
     const [t, key] = input.dataset.cost.split(".");
     input.value = state.cost[t][key];
   });
-  document.querySelectorAll("[data-value]").forEach((input) => {
-    const [t, key] = input.dataset.value.split(".");
-    input.value = state.value[t][key];
-  });
-  byId("value-lifetime").value = state.value.lifetime_years;
-  byId("value-rate").value = +(state.value.discount_rate * 100).toFixed(2);
 }
 
 function buildKreisList() {
@@ -297,8 +326,8 @@ function buildKreisList() {
     const i = Number(event.target.value);
     if (event.target.checked) state.kreise.add(i);
     else state.kreise.delete(i);
+    state.fitPending = true;
     kreiseChanged();
-    fitArea();
   });
   byId("kreis-filter").addEventListener("input", (event) => {
     const query = event.target.value.trim().toLowerCase();
@@ -325,15 +354,25 @@ function kreiseChanged() {
   schedule();
 }
 
+function setCenter(latlng, label) {
+  state.center = latlng;
+  byId("place").value = label || "";
+  state.fitPending = true;
+  schedule();
+}
+
 function readInputs() {
+  const previousRadius = state.radiusKm;
   state.areaMode = radioValue("area-mode");
-  state.radiusKm = Math.max(0.5, numberOf(byId("radius"), 15));
+  state.radiusKm = numberOrNull(byId("radius"));
+  if (state.radiusKm !== null && state.radiusKm <= 0) state.radiusKm = null;
+  if (state.radiusKm !== previousRadius) state.fitPending = true;
   state.charger = radioValue("charger");
   state.budgetMode = radioValue("budget-mode");
-  state.year = radioValue("year");
   state.hideLow = byId("hide-low").checked;
   TYPES.forEach((t) => {
-    state.budget[t] = Math.max(0, numberOf(byId(`budget-${t}`), 0));
+    const budget = numberOrNull(byId(`budget-${t}`));
+    state.budget[t] = budget === null ? null : Math.max(0, budget);
     state.maxPts[t] = Math.max(1, Math.round(numberOf(byId(`maxpts-${t}`), D.defaults.max_points[t])));
     state.spacing[t] = Math.max(0, numberOf(byId(`spacing-${t}`), D.defaults.spacing_m[t]));
   });
@@ -341,18 +380,16 @@ function readInputs() {
     const [t, key] = input.dataset.cost.split(".");
     state.cost[t][key] = Math.max(0, numberOf(input, D.defaults.cost[t][key]));
   });
-  document.querySelectorAll("[data-value]").forEach((input) => {
-    const [t, key] = input.dataset.value.split(".");
-    state.value[t][key] = Math.max(0, numberOf(input, D.defaults.value[t][key]));
-  });
-  state.value.lifetime_years = Math.max(1, numberOf(byId("value-lifetime"), D.defaults.value.lifetime_years));
-  state.value.discount_rate = Math.max(0, numberOf(byId("value-rate"), D.defaults.value.discount_rate * 100) / 100);
+  state.cost.AC.subsidy_pct = Math.min(100, state.cost.AC.subsidy_pct);
+  state.cost.DC.subsidy_pct = Math.min(100, state.cost.DC.subsidy_pct);
 
+  byId("area-hint").hidden = Boolean(state.areaMode);
   byId("area-radius").hidden = state.areaMode !== "radius";
   byId("area-kreis").hidden = state.areaMode !== "kreis";
-  byId("cost-detail").hidden = state.budgetMode !== "detailed";
+  byId("budget-hint").hidden = activeTypes().length > 0;
+  byId("cost-detail").hidden = state.budgetMode !== "detailed" || !activeTypes().length;
   document.querySelectorAll("[data-type]").forEach((el) => el.classList.toggle("is-off", !activeTypes().includes(el.dataset.type)));
-  if (!activeTypes().includes(state.tab)) setTab(activeTypes()[0]);
+  if (activeTypes().length && !activeTypes().includes(state.tab)) setTab(activeTypes()[0]);
   schedule();
 }
 
@@ -365,24 +402,31 @@ function setTab(type) {
 function initInputs() {
   const d = D.defaults;
   state.cost = clone(d.cost);
-  state.value = clone(d.value);
-  if (d.area) {
-    state.center = d.area.center;
-    state.radiusKm = d.area.radius_km;
-    byId("radius").value = d.area.radius_km;
-  }
   TYPES.forEach((t) => {
-    byId(`budget-${t}`).value = d.budget_eur[t];
+    byId(`budget-${t}`).value = "";
+    byId(`budget-${t}`).placeholder = `e.g. ${num(d.budget_eur[t])}`;
     byId(`maxpts-${t}`).value = d.max_points[t];
     byId(`spacing-${t}`).value = d.spacing_m[t];
   });
-  buildCostTables();
+  byId("radius").value = "";
+  byId("place").value = "";
+  document.querySelectorAll('input[name="area-mode"], input[name="charger"]').forEach((input) => { input.checked = false; });
+  buildCostTable();
   buildKreisList();
   kreiseChanged();
 
-  document.querySelectorAll(".inputs input:not([data-cost]):not([data-value]):not(#kreis-filter):not([type=checkbox][value])")
+  document.querySelectorAll(".inputs input:not([data-cost]):not(#kreis-filter):not(#place):not([type=checkbox][value])")
     .forEach((input) => input.addEventListener(input.type === "radio" || input.type === "checkbox" ? "change" : "input", readInputs));
-  document.querySelectorAll('input[name="area-mode"]').forEach((input) => input.addEventListener("change", fitArea));
+  document.querySelectorAll('input[name="area-mode"]').forEach((input) => input.addEventListener("change", () => {
+    state.fitPending = true;
+  }));
+  byId("place").addEventListener("change", (event) => {
+    const query = event.target.value.trim().toLowerCase();
+    if (!query) return;
+    const place = places.get(query) || [...places.values()].find((p) => p.label.toLowerCase().startsWith(query));
+    if (place) setCenter(place.latlng, place.label);
+    else toast(`No Baden-Württemberg town called "${event.target.value}". Pick one from the list or click the map.`, "info");
+  });
   document.querySelectorAll('input[name="picks-tab"]').forEach((input) => input.addEventListener("change", () => {
     state.tab = radioValue("picks-tab");
     renderResults();
@@ -412,6 +456,7 @@ function distanceM(lat1, lon1, lat2, lon2) {
 }
 
 function areaFilter() {
+  if (!areaComplete()) return () => false;
   if (state.areaMode === "radius") {
     const [clat, clon] = state.center;
     const r = state.radiusKm * 1000;
@@ -442,11 +487,15 @@ function kreisAt(lat, lon) {
 
 function drawArea() {
   areaLayer.clearLayers();
-  if (state.areaMode === "radius") {
-    L.circle(state.center, { radius: state.radiusKm * 1000, color: "#2563eb", weight: 2, dashArray: "6 6", fillOpacity: 0.04, interactive: false }).addTo(areaLayer);
+  if (state.areaMode === "radius" && state.center) {
+    if (state.radiusKm > 0) {
+      L.circle(state.center, { radius: state.radiusKm * 1000, color: "#2563eb", weight: 2, dashArray: "6 6", fillOpacity: 0.04, interactive: false }).addTo(areaLayer);
+    }
     L.circleMarker(state.center, { radius: 5, color: "#ffffff", weight: 2, fillColor: "#2563eb", fillOpacity: 1, interactive: false }).addTo(areaLayer);
-    byId("center-label").textContent = `Centre ${state.center[0].toFixed(3)}, ${state.center[1].toFixed(3)}.`;
   }
+  byId("center-label").textContent = state.center
+    ? `Centre ${state.center[0].toFixed(3)}, ${state.center[1].toFixed(3)}. Click the map to move it.`
+    : "No centre yet: type a town or click the map.";
   styleKreise();
 }
 
@@ -466,12 +515,13 @@ function styleKreise() {
 }
 
 function fitArea() {
-  if (state.areaMode === "radius") {
-    map.fitBounds(L.latLng(state.center).toBounds(state.radiusKm * 2000), { padding: [30, 30] });
-  } else if (state.kreise.size && kreiseLayer) {
+  if (state.areaMode === "radius" && state.center) {
+    if (state.radiusKm > 0) map.flyToBounds(L.latLng(state.center).toBounds(state.radiusKm * 2000), { padding: [30, 30], duration: 0.6 });
+    else map.flyTo(state.center, Math.max(map.getZoom(), 11), { duration: 0.6 });
+  } else if (state.areaMode === "kreis" && state.kreise.size && kreiseLayer) {
     const bounds = L.latLngBounds([]);
     kreiseLayer.eachLayer((layer) => state.kreise.has(layer.feature.properties.index) && bounds.extend(layer.getBounds()));
-    if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30] });
+    if (bounds.isValid()) map.flyToBounds(bounds, { padding: [30, 30], duration: 0.6 });
   }
 }
 
@@ -479,9 +529,8 @@ map.on("click", (event) => {
   if (!D) return;
   const { lat, lng } = event.latlng;
   if (state.areaMode === "radius") {
-    state.center = [lat, lng];
-    schedule();
-  } else {
+    setCenter([lat, lng], "");
+  } else if (state.areaMode === "kreis") {
     const i = kreisAt(lat, lng);
     if (i < 0) return;
     if (state.kreise.has(i)) state.kreise.delete(i);
@@ -491,18 +540,8 @@ map.on("click", (event) => {
 });
 
 // ---------------------------------------------------------------------------
-// Sizing (§5) and optimizer (§9)
+// Sizing (§5) and optimizer (§9); picks and sizing use today's prediction
 // ---------------------------------------------------------------------------
-function yearFactors() {
-  const factors = new Float32Array(D.candidates.kreise.length).fill(1);
-  if (state.year === "today") return factors;
-  D.candidates.kreise.forEach((k, i) => {
-    const entry = D.scenarios.factors[k.ags];
-    factors[i] = entry ? entry[state.year] : 1;
-  });
-  return factors;
-}
-
 function lookupFullShare(type, points, occupancy) {
   const S = D.sizing;
   const pc = classIndex(points, S.point_class_edges);
@@ -527,39 +566,37 @@ function sizeFor(type, occ2) {
 
 function siteCost(type, points) {
   const c = costFor(type);
-  return Math.max(0, c.grid_per_site + c.civil_per_site - c.subsidy_per_site + c.per_point * points);
+  const gross = c.grid_per_site + c.civil_per_site + c.per_point * points - c.subsidy_per_site;
+  return Math.max(0, gross * (1 - (c.subsidy_pct || 0) / 100));
 }
 
-function returnsFor(type, pointHours, points, cost) {
-  const v = state.value[type];
-  const om = costFor(type).om_per_point_year;
-  const energy = pointHours * v.delivered_kw * 365;
-  const margin = energy * (v.price_eur_kwh - v.energy_cost_eur_kwh) - om * points;
-  const r = state.value.discount_rate;
-  const L_ = state.value.lifetime_years;
-  const annuity = r > 0 ? (1 - Math.pow(1 + r, -L_)) / r : L_;
-  return { energy, margin, npv: -cost + margin * annuity, payback: margin > 0 ? cost / margin : null };
+// Site demand in a scenario year: point-hours x Kreis factor, capped at today's highest occupancy (§9)
+function scenarioDemand(pick, year) {
+  const cap = D.scenarios.occ_cap[pick.type];
+  const raw = C.occ[pick.i] * factors[year][C.kreis[pick.i]];
+  const occ2 = Math.min(raw, cap);
+  const pointHours = occ2 * D.sizing.reference_points * 24;
+  return { pointHours, hoursPerPoint: pointHours / pick.points, capped: raw > cap };
 }
 
-function optimize(type, inArea, factors) {
+function optimize(type, inArea) {
   const t = type === "AC" ? 0 : 1;
-  const budget = activeTypes().includes(type) ? state.budget[type] : 0;
-  const cap = D.scenarios.occ_cap[type];
+  const active = activeTypes().includes(type);
+  const budget = active ? state.budget[type] || 0 : 0;
   const ref = D.sizing.reference_points;
   const result = { type, budget, used: 0, picks: [], inArea: 0, skippedSpacing: 0 };
-  if (!activeTypes().includes(type)) return result;
+  if (!active) return result;
 
-  // 1. candidates of this type in the area, scored by (scenario) point-hours
+  // 1. candidates of this type in the area
   const order = [];
   for (let i = 0; i < C.n; i++) {
     if (C.type[i] !== t || (state.hideLow && C.low[i]) || !inArea(i)) continue;
-    C.score[i] = Math.min(C.occ[i] * factors[C.kreis[i]], cap);
     order.push(i);
   }
   result.inArea = order.length;
   if (budget <= 0) return result;
-  // 2. rank by predicted point-hours (occupancy x 2 points x 24 h; same order as occupancy)
-  order.sort((a, b) => C.score[b] - C.score[a]);
+  // 2. rank by predicted point-hours per day (occupancy x 2 points x 24 h; same order as occupancy)
+  order.sort((a, b) => C.occ[b] - C.occ[a]);
 
   // 3. greedy: skip within spacing of an earlier pick of this type, add site cost until the budget is used
   const spacing = state.spacing[type];
@@ -567,8 +604,7 @@ function optimize(type, inArea, factors) {
   const lonScale = mPerDegLon(48.6);
   const grid = new Map();
   const key = (gx, gy) => `${gx},${gy}`;
-  const minOverride = Math.min(2, ...state.overrides.values());
-  const cheapest = siteCost(type, minOverride);
+  const cheapest = siteCost(type, Math.min(2, ...state.overrides.values()));
   let remaining = budget;
   for (const i of order) {
     if (remaining < cheapest) break;
@@ -588,29 +624,15 @@ function optimize(type, inArea, factors) {
       continue;
     }
     const id = C.rows[i][C.col.id];
-    const sized = sizeFor(type, C.score[i]);
+    const sized = sizeFor(type, C.occ[i]);
     const override = state.overrides.get(id);
     const points = override || sized.n;
     const cost = siteCost(type, points);
     if (cost > remaining) continue;
     remaining -= cost;
-    const pointHours = C.score[i] * ref * 24;
-    result.picks.push({
-      i,
-      id,
-      type,
-      occ2: C.score[i],
-      factor: factors[C.kreis[i]],
-      capped: C.occ[i] * factors[C.kreis[i]] > cap,
-      pointHours,
-      hoursPerPoint: pointHours / points,
-      points,
-      sized,
-      override: Boolean(override),
-      cost,
-      low: Boolean(C.low[i]),
-      ...returnsFor(type, pointHours, points, cost),
-    });
+    const pointHours = C.occ[i] * ref * 24;
+    result.picks.push({ i, id, type, occ2: C.occ[i], pointHours, hoursPerPoint: pointHours / points, points, sized,
+      override: Boolean(override), cost, low: Boolean(C.low[i]) });
     if (!grid.has(key(gx, gy))) grid.set(key(gx, gy), []);
     grid.get(key(gx, gy)).push(i);
   }
@@ -623,18 +645,26 @@ function optimize(type, inArea, factors) {
 // ---------------------------------------------------------------------------
 let results = { AC: null, DC: null };
 let lastAreaKey = "";
+let ready = false;
 
 function run() {
   if (!D) return;
+  const steps = missingInputs();
+  ready = steps.every((s) => s.done);
   const start = performance.now();
   const inArea = areaFilter();
-  const factors = yearFactors();
-  results = { AC: optimize("AC", inArea, factors), DC: optimize("DC", inArea, factors) };
+  results = ready ? { AC: optimize("AC", inArea), DC: optimize("DC", inArea) } : { AC: null, DC: null };
   const elapsed = performance.now() - start;
+  if (!ready) state.active = null;
   drawArea();
+  renderStart(steps);
   renderPicks();
   renderResults();
-  renderYearNote(factors);
+  renderLegend();
+  if (state.fitPending && areaComplete()) {
+    state.fitPending = false;
+    fitArea();
+  }
   const areaKey = `${state.areaMode}|${state.center}|${state.radiusKm}|${[...state.kreise]}|${state.charger}|${state.hideLow}`;
   if (areaKey !== lastAreaKey) {
     lastAreaKey = areaKey;
@@ -642,17 +672,34 @@ function run() {
   }
   byId("override-count").textContent = state.overrides.size ? `${state.overrides.size} active.` : "";
   byId("override-reset").disabled = state.overrides.size === 0;
-  byId("timing").textContent = `Optimizer ran in ${num(elapsed, 0)} ms over ${num(results.AC.inArea + results.DC.inArea)} candidates in the area.`;
+  byId("timing").textContent = ready
+    ? `Optimizer ran in ${num(elapsed, 0)} ms over ${num(results.AC.inArea + results.DC.inArea)} candidates in the area.` : "";
+}
+
+function renderStart(steps) {
+  const box = byId("start");
+  byId("summary-block").hidden = !ready;
+  byId("picks-block").hidden = !ready;
+  box.hidden = ready;
+  if (ready) return;
+  box.innerHTML = `<p class="start-title">Set the inputs to get recommendations</p>
+    <ol class="start-steps">${steps.map((s) => `<li class="${s.done ? "is-done" : ""}">
+      <span class="start-check" aria-hidden="true">${s.done ? "✓" : ""}</span>
+      <span><b>${s.label}</b>${s.done ? "" : ` <span class="hint-inline">${escapeHtml(s.hint)}</span>`}</span></li>`).join("")}</ol>
+    <p class="hint">Advanced settings and cost components already hold default values.</p>`;
 }
 
 function kreisName(i) {
   return D.candidates.kreise[C.kreis[i]].name;
 }
 
+function parkingLabel(pick) {
+  const parking = C.rows[pick.i][C.col.parking];
+  return parking ? parking.replace(/[_-]/g, " ") : "parking";
+}
+
 function placeLabel(pick) {
-  const row = C.rows[pick.i];
-  const parking = row[C.col.parking] ? row[C.col.parking].replace(/[_-]/g, " ") : "parking";
-  return `${kreisName(pick.i)} · ${parking}`;
+  return `${kreisName(pick.i)} · ${parkingLabel(pick)}`;
 }
 
 function reasonText(pick) {
@@ -660,21 +707,75 @@ function reasonText(pick) {
   return pick.type === "DC" ? `DC: ${reason}` : "AC: no motorway, primary road or supermarket nearby";
 }
 
-function pickDetailHtml(pick) {
+function pointIcons(pick) {
+  return `<span class="point-icons" aria-hidden="true">${'<i></i>'.repeat(Math.min(pick.points, 40))}</span>`;
+}
+
+// Per-pick facts, shared by the map popup and the expanded list row
+function pickInfoHtml(pick) {
   const row = C.rows[pick.i];
-  const yearNote = state.year === "today" ? "" :
-    `<dt>Kreis factor ${state.year}</dt><dd>×${num(pick.factor, 2)} <span class="tag-synthetic">synthetic</span>${pick.capped ? " · capped" : ""}</dd>`;
-  return `<dl>
-    <dt>Site demand</dt><dd>${num(pick.pointHours, 1)} point-hours / day <span class="tag-synthetic">synthetic</span></dd>
-    <dt>Sizing <button class="info" type="button" data-info="points">i</button></dt><dd>${pick.override ? `override (rule: ${pick.sized.n})` : `${pick.sized.n} points`} · full on ~${num(lookupFullShare(pick.type, pick.points, (pick.occ2 * 2) / pick.points) * 100, 0)} % of days${pick.sized.capped && !pick.override ? " · at cap" : ""}</dd>
-    ${yearNote}
-    <dt>Energy <button class="info" type="button" data-info="energy">i</button></dt><dd>${num(pick.energy / 1000, 0)} MWh / year <span class="tag-assumed">estimate</span></dd>
-    <dt>Returns <button class="info" type="button" data-info="returns">i</button></dt><dd>${euro(pick.margin)} / year · NPV ${euro(pick.npv)}${pick.payback ? ` · payback ${num(pick.payback, 1)} y` : ""} <span class="tag-assumed">estimate</span></dd>
-    <dt>Type <button class="info" type="button" data-info="dc_reason">i</button></dt><dd>${escapeHtml(reasonText(pick))}</dd>
-    <dt>Nearby</dt><dd>${num(row[C.col.residents_1km])} residents within 1 km · ${num(row[C.col.destinations_500m])} destinations within 500 m</dd>
-    <dt>Feed station</dt><dd>${num(row[C.col.feed_m] / 1000, 1)} km to the nearest</dd>
-  </dl>
-  <div class="pick-flags">${pick.low ? '<span class="tag-low">Low confidence</span> <button class="info" type="button" data-info="confidence">i</button>' : ""}</div>`;
+  const years = YEARS.map((year) => ({ year, ...scenarioDemand(pick, year) }));
+  const today = { year: "Today", pointHours: pick.pointHours, hoursPerPoint: pick.hoursPerPoint };
+  const cells = [today, ...years];
+  const fullShare = lookupFullShare(pick.type, pick.points, (pick.occ2 * D.sizing.reference_points) / pick.points);
+  return `
+    <div class="points-cue">${pointIcons(pick)}<span><b>${pick.points}</b> charging points${pick.override ? ` <span class="hint-inline">(your override; rule: ${pick.sized.n})</span>` : ""}
+      <button class="info" type="button" data-info="points">i</button></span></div>
+    <p class="hint flush">Full on ~${num(fullShare * 100, 0)} % of days at this size${pick.sized.capped && !pick.override ? " · at the cap" : ""}</p>
+    <table class="demand-table">
+      <caption>Site demand <span class="tag-synthetic">synthetic</span> <button class="info" type="button" data-info="demand_years">i</button></caption>
+      <thead><tr><th></th>${cells.map((c) => `<th scope="col">${c.year}</th>`).join("")}</tr></thead>
+      <tbody>
+        <tr><th scope="row">Point-h / day</th>${cells.map((c) => `<td>${num(c.pointHours, 0)}${c.capped ? "*" : ""}</td>`).join("")}</tr>
+        <tr><th scope="row">h / point / day</th>${cells.map((c) => `<td>${c.hoursPerPoint.toFixed(1)}</td>`).join("")}</tr>
+      </tbody>
+    </table>
+    ${years.some((y) => y.capped) ? '<p class="hint flush">* capped at today\'s highest occupancy</p>' : ""}
+    <dl class="pick-facts">
+      <dt>Site cost <button class="info" type="button" data-info="site_cost">i</button></dt><dd>${euro(pick.cost)}</dd>
+      <dt>Type <button class="info" type="button" data-info="dc_reason">i</button></dt><dd>${escapeHtml(reasonText(pick))}</dd>
+      <dt>Nearby</dt><dd>${num(row[C.col.residents_1km])} residents within 1 km · ${num(row[C.col.destinations_500m])} destinations within 500 m</dd>
+      <dt>Nearest station with usage data <button class="info" type="button" data-info="nearest_station">i</button></dt><dd>${num(row[C.col.feed_m] / 1000, 1)} km</dd>
+    </dl>
+    ${pick.low ? '<div class="pick-flags"><span class="tag-low">Low confidence</span> <button class="info" type="button" data-info="confidence">i</button></div>' : ""}`;
+}
+
+// Popup: facts on the left, Google Street View on the right (same keyless embed as app/js/streetview.js)
+function popupContent(pick, rank) {
+  const ll = `${C.lat[pick.i].toFixed(6)},${C.lon[pick.i].toFixed(6)}`;
+  const box = document.createElement("div");
+  box.className = "sv-bubble pick-bubble";
+  box.innerHTML = `<div class="sv-info pick-info">
+      <p class="eyebrow">${pick.type} pick #${rank + 1} · ${escapeHtml(kreisName(pick.i))}</p>
+      <p class="popup-title">${escapeHtml(parkingLabel(pick))}</p>
+      ${pickInfoHtml(pick)}
+      <p class="sv-links"><a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${ll}" target="_blank" rel="noopener noreferrer">Street View in Google Maps ↗</a>
+        <button class="info" type="button" data-info="streetview">i</button></p>
+    </div>`;
+  const iframe = document.createElement("iframe");
+  iframe.title = "Google Street View";
+  iframe.referrerPolicy = "no-referrer";
+  iframe.allow = "accelerometer; gyroscope; fullscreen";
+  iframe.allowFullscreen = true;
+  iframe.loading = "lazy";
+  iframe.src = `https://www.google.com/maps?layer=c&cbll=${ll}&cbp=12,0,0,0,0&output=svembed`;
+  box.appendChild(iframe);
+  const { width, stacked } = popupLayout();
+  box.style.width = `${width}px`;
+  if (!stacked) iframe.style.width = `${width - 280}px`;
+  return box;
+}
+
+// Popup size follows the map area: info and Street View side by side when there is room, stacked otherwise
+function popupLayout() {
+  const width = Math.max(260, Math.min(780, map.getSize().x - 60));
+  return { width, stacked: width < 600 };
+}
+
+function popupOptions() {
+  const { width, stacked } = popupLayout();
+  return { minWidth: width, maxWidth: width, className: `sv-popup pick-popup${stacked ? " stacked" : ""}`,
+    autoPanPaddingTopLeft: [20, 20], autoPanPaddingBottomRight: [20, 20] };
 }
 
 function renderPicks() {
@@ -684,19 +785,21 @@ function renderPicks() {
     const res = results[type];
     if (!res) return;
     res.picks.forEach((pick, rank) => {
-      const cls = `pick-icon ${type.toLowerCase()}${pick.low ? " low" : ""}${state.active === pick.id ? " is-active" : ""}`;
+      const cls = `pick-marker ${type.toLowerCase()}${pick.low ? " low" : ""}${state.active === pick.id ? " is-active" : ""}`;
       const marker = rank < RANKED_LIMIT
         ? L.marker([C.lat[pick.i], C.lon[pick.i]], {
           pane: "picks",
-          icon: L.divIcon({ className: "", html: `<div class="${cls}">${rank + 1}</div>`, iconSize: [24, 24], iconAnchor: [12, 12] }),
-          title: `${type} #${rank + 1}`,
+          icon: L.divIcon({
+            className: "",
+            html: `<div class="${cls}"><span class="pick-num">${rank + 1}</span><span class="pick-pts" title="${pick.points} charging points">${pick.points}</span></div>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 12],
+          }),
+          title: `${type} #${rank + 1}: ${pick.points} points`,
           keyboard: false,
         })
-        : L.circleMarker([C.lat[pick.i], C.lon[pick.i]], { pane: "picks", radius: 4, color: "#ffffff", weight: 1, fillColor: cssVar(type === "AC" ? "--ac" : "--dc"), fillOpacity: 0.9 });
-      marker.bindPopup(() =>
-        `<p class="popup-title">${type} pick #${rank + 1} · ${pick.hoursPerPoint.toFixed(1)} h per point per day</p>` +
-        `<p class="hint" style="margin:0 0 6px">${escapeHtml(placeLabel(pick))} · ${pick.points} points · ${euro(pick.cost)}</p>${pickDetailHtml(pick)}`,
-      { maxWidth: 340, className: "pick-popup", autoPanPaddingTopLeft: [280, 20], autoPanPaddingBottomRight: [20, 20] });
+        : L.circleMarker([C.lat[pick.i], C.lon[pick.i]], { pane: "picks", radius: 3 + Math.min(pick.points, 12) / 3, color: "#ffffff", weight: 1, fillColor: cssVar(type === "AC" ? "--ac" : "--dc"), fillOpacity: 0.9 });
+      marker.bindPopup(() => popupContent(pick, rank), popupOptions());
       marker.on("click", () => selectPick(pick.id, false));
       marker.addTo(picksLayer);
       markers.set(pick.id, marker);
@@ -705,19 +808,24 @@ function renderPicks() {
 }
 
 function renderResults() {
-  const summary = byId("summary");
-  summary.innerHTML = TYPES.map((type) => {
+  if (!ready) {
+    byId("picks").innerHTML = "";
+    return;
+  }
+  byId("summary").innerHTML = TYPES.map((type) => {
     const res = results[type];
-    if (!res || !activeTypes().includes(type)) {
+    if (!activeTypes().includes(type)) {
       return `<div class="summary-card ${type.toLowerCase()}"><div class="summary-top"><strong>${type}</strong><span class="summary-empty">not selected</span></div></div>`;
     }
     const share = res.budget > 0 ? Math.min(100, (res.used / res.budget) * 100) : 0;
     const points = res.picks.reduce((sum, p) => sum + p.points, 0);
-    const pointHours = res.picks.reduce((sum, p) => sum + p.pointHours, 0);
+    const demand = [["Today", res.picks.reduce((sum, p) => sum + p.pointHours, 0)],
+      ...YEARS.map((year) => [year, res.picks.reduce((sum, p) => sum + scenarioDemand(p, year).pointHours, 0)])];
     return `<div class="summary-card ${type.toLowerCase()}">
       <div class="summary-top"><strong>${type} · ${res.picks.length} site${res.picks.length === 1 ? "" : "s"}, ${points} points</strong><span>${euro(res.used)}</span></div>
       <div class="bar" role="img" aria-label="${num(share, 0)} % of the ${type} budget used"><span style="width:${share}%"></span></div>
-      <div class="summary-sub">${euro(res.budget - res.used)} left of ${euro(res.budget)} · ${num(pointHours, 0)} point-hours / day</div>
+      <div class="summary-sub">${euro(res.budget - res.used)} left of ${euro(res.budget)}</div>
+      ${res.picks.length ? `<div class="summary-sub">Demand, point-h / day: ${demand.map(([y, v]) => `${y} <b>${num(v, 0)}</b>`).join(" · ")} <span class="tag-synthetic">synthetic</span></div>` : ""}
       ${res.inArea === 0 ? `<div class="summary-sub">No ${type} candidates in the area.</div>` : ""}
     </div>`;
   }).join("");
@@ -729,8 +837,8 @@ function renderResults() {
   const list = byId("picks");
   if (!res || !res.picks.length) {
     const why = !res || !activeTypes().includes(state.tab) ? `${state.tab} is not selected.` :
-      res.inArea === 0 ? (state.areaMode === "kreis" && !state.kreise.size ? "Select at least one Landkreis." : `No ${state.tab} candidates in the area.`) :
-        res.budget <= 0 ? `The ${state.tab} budget is 0.` : `The ${state.tab} budget is smaller than the cheapest site (${euro(siteCost(state.tab, 2))}).`;
+      res.inArea === 0 ? `No ${state.tab} candidates in the area.` :
+        `The ${state.tab} budget is smaller than the cheapest site (${euro(siteCost(state.tab, 2))}).`;
     list.innerHTML = `<li class="picks-empty">No picks. ${why}</li>`;
     return;
   }
@@ -747,7 +855,7 @@ function renderResults() {
         <span class="pick-points"><input type="number" min="1" max="40" step="1" value="${pick.points}" class="${pick.override ? "is-override" : ""}" aria-label="Points at pick ${rank + 1}" data-points="${pick.id}"></span>
         <span class="pick-cost">${euro(pick.cost)}</span>
       </div>
-      ${state.active === pick.id ? `<div class="pick-detail">${pickDetailHtml(pick)}</div>` : ""}
+      ${state.active === pick.id ? `<div class="pick-detail">${pickInfoHtml(pick)}</div>` : ""}
     </li>`).join("") + (more > 0 ? `<li class="picks-empty">+ ${num(more)} more ${state.tab} sites (shown as dots on the map; click one for details).</li>` : "");
 }
 
@@ -778,40 +886,33 @@ function selectPick(id, fly) {
   const pick = [...(results.AC?.picks || []), ...(results.DC?.picks || [])].find((p) => p.id === id);
   if (pick && pick.type !== state.tab) setTab(pick.type);
   renderResults();
-  renderPicks();
+  if (fly) renderPicks(); // markers are only rebuilt from the list, so a marker click keeps its popup open
   if (pick && state.active === id) {
-    if (fly) map.flyTo([C.lat[pick.i], C.lon[pick.i]], Math.max(map.getZoom(), 15), { duration: 0.6 });
+    if (fly) map.flyTo([C.lat[pick.i], C.lon[pick.i]], Math.max(map.getZoom(), 16), { duration: 0.6 });
     const marker = markers.get(id);
-    if (marker) setTimeout(() => marker.openPopup(), fly ? 650 : 0);
+    if (marker && fly) setTimeout(() => marker.openPopup(), 650);
     const row = byId("picks").querySelector(`[data-id="${id}"]`);
     if (row) row.scrollIntoView({ block: "nearest" });
   }
 }
 
-function renderYearNote(factors) {
-  const note = byId("year-note");
-  const supply = D.scenarios.supply;
-  if (state.year === "today") {
-    note.textContent = `Predictions at 2026 levels. BW today: ${num(supply.points_today)} register points.`;
-    return;
-  }
-  const year = Number(state.year);
-  const values = [...factors];
-  const projected = supply.points_today + supply.added_per_year * (year - 2026);
-  note.innerHTML = `Kreis factors ${num(Math.min(...values), 2)}–${num(Math.max(...values), 2)} <span class="tag-synthetic">synthetic</span>. ` +
-    `Supply trend (real): +${num(supply.added_per_year)} points / year → ~${num(projected)} in ${year}.` +
-    (year === 2035 ? " Long-term: weakest scenario." : "");
-}
+map.on("popupopen", () => document.querySelector(".map-wrap").classList.add("popup-open"));
+map.on("popupclose", () => document.querySelector(".map-wrap").classList.remove("popup-open"));
+map.on("resize", () => {
+  if (ready) renderPicks();
+});
 
 // ---------------------------------------------------------------------------
 // Layers and legend
 // ---------------------------------------------------------------------------
-const cssVar = (name) => getComputedStyle(root).getPropertyValue(name).trim();
+function cssVar(name) {
+  return getComputedStyle(root).getPropertyValue(name).trim();
+}
 
 function drawCandidates() {
   candidatesLayer.clearLayers();
   const inArea = areaFilter();
-  const types = activeTypes().map((t) => (t === "AC" ? 0 : 1));
+  const types = (activeTypes().length ? activeTypes() : TYPES).map((t) => (t === "AC" ? 0 : 1));
   let drawn = 0;
   let total = 0;
   const colors = [cssVar("--ac"), cssVar("--dc")];
@@ -828,6 +929,7 @@ function drawCandidates() {
 }
 
 // 500 m cells drawn into canvas tiles (fast for ~49k cells)
+const cellBuckets = new Map();
 const UsageLayer = L.GridLayer.extend({
   createTile(coords) {
     const tile = document.createElement("canvas");
@@ -855,7 +957,6 @@ const UsageLayer = L.GridLayer.extend({
     return tile;
   },
 });
-const cellBuckets = new Map();
 const usageLayer = new UsageLayer({ pane: "usage", opacity: 0.7 });
 
 function prepareCells() {
@@ -881,7 +982,7 @@ function buildOverused() {
     L.circleMarker([row[col.lat], row[col.lon]], { radius: 5, color: "#ffffff", weight: 1.5, fillColor: "#dc2626", fillOpacity: 0.9 })
       .bindPopup(`<p class="popup-title">Overused ${type} station</p>
         <p>${escapeHtml(row[col.name] || "")}<br><span class="hint" style="margin:0">${escapeHtml(row[col.operator] || "")}</span></p>
-        <p>Fully occupied hour on <b>${num(row[col.full_share] * 100, 0)} %</b> of ${row[col.days]} valid days
+        <p>Fully occupied hour on <b>${num(row[col.full_share] * 100, 0)} %</b> of ${row[col.days]} days with usage data
         (target ${num(meta.targets[type] * 100, 0)} %). Mean occupancy ${num(hours(row[col.occ]), 1)} h per point per day.</p>`)
       .addTo(overusedLayer);
   });
@@ -922,22 +1023,27 @@ function applyLayers() {
 }
 
 function renderLegend() {
-  const blocks = [`<div class="legend-block"><p class="legend-title">Recommended sites</p><ul>
-    <li><span class="legend-pick" style="background:var(--ac)"></span>AC pick (rank)</li>
-    <li><span class="legend-pick dc" style="background:var(--dc)"></span>DC pick (rank)</li>
-    <li><span class="legend-pick low" style="background:var(--text-3)"></span>Low confidence</li></ul></div>`];
+  const blocks = [];
+  if (ready) {
+    blocks.push(`<div class="legend-block"><p class="legend-title">Recommended sites</p><ul>
+      <li><span class="pick-marker ac legend-marker">1</span>AC pick (number = rank)</li>
+      <li><span class="pick-marker dc legend-marker">1</span>DC pick (number = rank)</li>
+      <li><span class="pick-pts legend-pts">4</span>Charging points at the site</li>
+      <li><span class="legend-pick low" style="background:var(--text-3)"></span>Low confidence</li></ul></div>`);
+  }
   if (byId("layer-usage").checked) {
     blocks.push(`<div class="legend-block"><p class="legend-title">Expected usage <span class="tag-synthetic">synthetic</span></p>
       <p class="legend-sub">Hours per point per day, typical station, today</p>
       <div class="ramp">${USAGE_COLORS.map((c) => `<span style="background:${c}"></span>`).join("")}</div>
       <div class="ramp-ends"><span>&lt; ${USAGE_BREAKS[0]} h</span><span>≥ ${USAGE_BREAKS[USAGE_BREAKS.length - 1]} h</span></div></div>`);
   }
-  if (byId("layer-candidates").checked && candidatesLayer.total !== undefined) {
-    const capped = candidatesLayer.total > candidatesLayer.drawn ? ` (first ${num(candidatesLayer.drawn)} shown)` : "";
-    blocks.push(`<div class="legend-block"><p class="legend-title">Candidates: ${num(candidatesLayer.total)}${capped}</p></div>`);
+  if (byId("layer-candidates").checked) {
+    const text = !areaComplete() ? "Candidates: set an area first" :
+      `Candidates: ${num(candidatesLayer.total || 0)}${candidatesLayer.total > candidatesLayer.drawn ? ` (first ${num(candidatesLayer.drawn)} shown)` : ""}`;
+    blocks.push(`<div class="legend-block"><p class="legend-title">${text}</p></div>`);
   }
   if (byId("layer-overused").checked) {
-    blocks.push(`<div class="legend-block"><ul><li><span class="swatch dot" style="background:#dc2626"></span>Overused station (feed)</li></ul></div>`);
+    blocks.push('<div class="legend-block"><ul><li><span class="swatch dot" style="background:#dc2626"></span>Overused station (usage data)</li></ul></div>');
   }
   if (byId("layer-stations").checked) {
     blocks.push(`<div class="legend-block"><ul><li><span class="swatch dot" style="background:#cbd5e1"></span>Register station, AC</li>
@@ -984,12 +1090,13 @@ async function start() {
   try {
     if (!(await loadAll())) return;
     C = prepareCandidates();
+    prepareFactors();
     prepareCells();
+    preparePlaces();
     initInputs();
     readInputs();
     await loadContext();
     applyLayers();
-    fitArea();
     run();
   } catch (error) {
     console.error("Mock-up failed to start", error);
