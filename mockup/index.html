@@ -257,10 +257,10 @@
   <!-- Shown instead of the app when data is missing -->
   <div id="fatal" class="fatal" role="alert" hidden>
     <div class="fatal-card">
-      <h2>Mock-up data missing</h2>
+      <h2>Mock-up data needs to be generated</h2>
       <p id="fatal-text"></p>
       <pre><code>python src/mockup_data.py</code></pre>
-      <p class="hint">Then reload this page. The script writes to <code>data/processed/mockup/</code> and needs the processed files from <code>python src/extract.py</code>.</p>
+      <p class="hint">Then reload this page. The script writes to <code>data/processed/mockup/</code> and needs the processed files from <code>python src/extract.py</code> (including the occupancy parquet files and <code>data/raw/vg250.zip</code>); if one is missing it stops and names it.</p>
     </div>
   </div>
 

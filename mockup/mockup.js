@@ -7,6 +7,7 @@ import { loadJSON, toast } from "../app/js/status.js";
 
 const DATA = "../data/processed/mockup/";
 const LOAD_ID = Date.now();
+const DATA_VERSION = 2; // must match DATA_VERSION in src/mockup_data.py
 const FILES = ["candidates", "cells", "stations", "overused", "sizing", "scenarios", "defaults", "places"];
 const TYPES = ["AC", "DC"];
 const YEARS = ["2030", "2035"];
@@ -190,10 +191,17 @@ async function loadAll() {
   if (missing.length) {
     results.forEach((result) => result.status === "rejected" && console.error("Mock-up data", result.reason));
     fatal(`Could not load ${missing.map((name) => `<code>data/processed/mockup/${name}.json</code>`).join(", ")}. ` +
-      "Generate the mock-up data first:");
+      "The data folder is not in git; generate it on this computer:");
     return false;
   }
   D = Object.fromEntries(FILES.map((name, i) => [name, results[i].value]));
+  const outdated = FILES.filter((name) => (D[name].meta || {}).version !== DATA_VERSION);
+  if (outdated.length) {
+    console.error("Mock-up data outdated", outdated);
+    fatal(`${outdated.map((name) => `<code>${name}.json</code>`).join(", ")} ${outdated.length === 1 ? "was" : "were"} made by an older version of the generator. ` +
+      "Run it again; it rewrites only the outdated files:");
+    return false;
+  }
   return true;
 }
 
