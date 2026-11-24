@@ -184,6 +184,12 @@
     .card { padding: 14px 18px; } .node { padding: 5px 10px; font-size: .85rem; }
     .flow .col { gap: 5px; } .steps div { padding-top: 8px; padding-bottom: 8px; }
   }
+  /* closing slide */
+  section.end { overflow: hidden; }
+  section.end h1 { font-size: clamp(2.6rem, 6.4vw, 5.2rem); }
+  section.end .chain { margin-top: 1vh; }
+  section.end .bolt { position: absolute; right: 6vw; top: 50%; transform: translateY(-50%); height: 62vh; color: var(--accent); opacity: .09; pointer-events: none; }
+  section.end > :not(.bolt):not(.pnum) { position: relative; z-index: 1; }
   /* page number, bottom right of every slide */
   .pnum { position: absolute; right: 4vw; bottom: 2.5vh; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; z-index: 2; pointer-events: none; }
   @media (max-width: 900px) {
@@ -564,6 +570,15 @@
     <a href="../app/index.html" target="_blank" rel="noopener" style="margin-left:0">Data map ↗</a>
   </div>
   <iframe id="app" title="Charging site recommender mock-up" data-src="../mockup/index.html" allow="fullscreen; geolocation"></iframe>
+</section>
+
+<!-- closing -->
+<section class="slide end" id="end">
+  <svg class="bolt" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>
+  <span class="kicker">DS500 · Interim presentation</span>
+  <h1>Thank you for your attention</h1>
+  <p class="lead">We look forward to your questions and feedback.</p>
+  <p class="tag" style="align-self:flex-start">Arun · Marko · Roland</p>
 </section>
 
 <script>
