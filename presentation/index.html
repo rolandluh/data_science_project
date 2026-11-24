@@ -184,6 +184,8 @@
     .card { padding: 14px 18px; } .node { padding: 5px 10px; font-size: .85rem; }
     .flow .col { gap: 5px; } .steps div { padding-top: 8px; padding-bottom: 8px; }
   }
+  /* page number, bottom right of every slide */
+  .pnum { position: absolute; right: 4vw; bottom: 2.5vh; font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; z-index: 2; pointer-events: none; }
   @media (max-width: 900px) {
     .g2, .g3, .g4 { grid-template-columns: 1fr; }
     .flow { grid-template-columns: 1fr; } .flow .ar { transform: rotate(90deg); }
@@ -206,7 +208,6 @@
 
 <!-- 2 -->
 <section class="slide" id="s2">
-  <span class="speaker">Arun</span>
   <span class="kicker">1 · Who is the user?</span>
   <h2>Operators and investors with a limited budget</h2>
   <div class="grid g2">
@@ -232,7 +233,6 @@
 
 <!-- 3 -->
 <section class="slide ana" id="s3">
-  <span class="speaker">Roland</span>
   <span class="kicker">2 · How will they use it?</span>
   <h2>Meet Lena, expansion manager at EnBW, Karlsruhe</h2>
   <p class="sub">Her team has a budget. She must pick the best sites and defend them.</p>
@@ -248,7 +248,6 @@
 
 <!-- 4 -->
 <section class="slide ana" id="s4">
-  <span class="speaker">Roland</span>
   <span class="kicker">2 · How will they use it?</span>
   <h2>Her workflow in the app</h2>
   <div class="seq seq5">
@@ -342,7 +341,6 @@
 
 <!-- 7 · Demand: features and target -->
 <section class="slide ana" id="s7">
-  <span class="speaker">Marko</span>
   <span class="kicker">4 · Demand estimation</span>
   <h2>Features and target</h2>
   <p class="sub"><b>Unit:</b> one site = all stations within 50 m</p>
@@ -385,7 +383,6 @@
 
 <!-- 8 · Demand: model and validation -->
 <section class="slide ana dense" id="s8">
-  <span class="speaker">Marko</span>
   <span class="kicker">4 · Demand estimation</span>
   <h2>Random Forest: two tests, three baselines</h2>
   <div class="grp">
@@ -424,7 +421,6 @@
 
 <!-- 10 · Demand: biases -->
 <section class="slide ana" id="s10">
-  <span class="speaker">Marko</span>
   <span class="kicker">4 · Demand estimation</span>
   <h2>Biases</h2>
   <table class="tbl2">
@@ -440,7 +436,6 @@
 
 <!-- 11 · Optimization: input and output -->
 <section class="slide ana" id="s11o">
-  <span class="speaker">Marko</span>
   <span class="kicker">5 · Optimization</span>
   <h2>Optimizer input and output</h2>
   <div class="seq" style="grid-template-columns:1fr auto 1fr">
@@ -468,7 +463,6 @@
 
 <!-- 12 · Optimization: AC or DC -->
 <section class="slide ana" id="s12o">
-  <span class="speaker">Marko</span>
   <span class="kicker">5 · Optimization</span>
   <h2>DC or AC?</h2>
   <div class="row" style="grid-template-columns:2fr 1fr">
@@ -498,7 +492,6 @@
 
 <!-- 13 · Optimization: greedy -->
 <section class="slide ana" id="s13o">
-  <span class="speaker">Marko</span>
   <span class="kicker">5 · Optimization</span>
   <h2>Greedy search: pick until the money runs out</h2>
   <div class="seq">
@@ -527,7 +520,6 @@
 
 <!-- 14 · Optimization: sizing -->
 <section class="slide ana" id="s14o">
-  <span class="speaker">Marko</span>
   <span class="kicker">5 · Optimization</span>
   <h2>Sizing algorithm</h2>
   <div class="seq">
@@ -548,7 +540,6 @@
 
 <!-- 16 · Future -->
 <section class="slide ana" id="s16o">
-  <span class="speaker">Marko</span>
   <span class="kicker">6 · Future additions</span>
   <h2>What comes next</h2>
   <div class="rows">
@@ -588,6 +579,13 @@
     const a = document.createElement("a");
     a.href = "#" + s.id; a.title = "Slide " + (i + 1);
     dots.appendChild(a);
+    // Page number, counted from the slide order so it stays right when slides move
+    // (not on the demo slide, where it would cover the map)
+    if (!s.classList.contains("demo")) {
+      const n = document.createElement("span");
+      n.className = "pnum"; n.textContent = (i + 1) + " / " + slides.length;
+      s.appendChild(n);
+    }
   });
   const links = [...dots.children];
   const bar = document.getElementById("bar");
