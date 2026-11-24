@@ -1,0 +1,652 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Electric Vehicle Charging Site Planner – Interim Presentation</title>
+<style>
+  :root {
+    --bg: #dde7f6; --panel: #f3f6fb; --panel2: #e3f1ee; --text: #14213d; --muted: #3f4a66;
+    --accent: #0b7a6b; --accent2: #0369a1; --pop: #d9480f; --warn: #b45309; --bad: #be123c; --line: #cdd6e6;
+  }
+  .card, .node, .chain span.box, .steps div, .pain div { box-shadow: 0 2px 0 rgba(20, 33, 61, .10), 0 6px 16px rgba(20, 33, 61, .06); border-color: #bcc8de; }
+  section.slide { background: #dde7f6; }
+  .card, .node, .steps div, .pain div, .chain span.box { background: #fff; }
+  .kicker { color: var(--pop) !important; }
+  h1, h2 { color: var(--text); }
+  h1 { border-left: 10px solid var(--pop); padding-left: 24px; }
+  .card.hl { background: #e3f1ee; }
+  .tag.ok { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .tag.todo { background: #fdebd3; }
+  * { box-sizing: border-box; margin: 0; }
+  html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font: 18px/1.45 system-ui, "Segoe UI", sans-serif; }
+  section.slide {
+    min-height: 100vh; scroll-snap-align: start; padding: 6vh 7vw 8vh;
+    display: flex; flex-direction: column; justify-content: center; gap: 3vh; position: relative;
+  }
+  .kicker { color: var(--accent); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; font-size: .8rem; }
+  .speaker { color: var(--muted); font-size: .8rem; position: absolute; top: 3vh; right: 4vw; }
+  h1 { font-size: clamp(2.4rem, 6vw, 4.6rem); line-height: 1.05; }
+  h2 { font-size: clamp(1.7rem, 3.2vw, 2.7rem); line-height: 1.15; max-width: none; text-wrap: balance; }
+  h2.wide { max-width: none; }
+  .lead { font-size: clamp(1.1rem, 1.8vw, 1.5rem); color: var(--muted); max-width: 70ch; }
+  .grid { display: grid; gap: 20px; }
+  .g2 { grid-template-columns: repeat(2, 1fr); } .g3 { grid-template-columns: repeat(3, 1fr); } .g4 { grid-template-columns: repeat(4, 1fr); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px 24px; }
+  .card h3 { font-size: 1.15rem; margin-bottom: 8px; }
+  .card p, .card li { color: var(--muted); font-size: 1rem; }
+  .card ul { padding-left: 1.1em; display: grid; gap: 4px; }
+  .card.hl { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .big { font-size: clamp(2rem, 4.5vw, 3.6rem); font-weight: 800; color: var(--accent); line-height: 1; }
+  .tag { display: inline-block; font-size: .78rem; padding: 3px 10px; border-radius: 99px; background: var(--panel2); color: var(--muted); border: 1px solid var(--line); }
+  .tag.ok { color: var(--accent); border-color: var(--accent); } .tag.todo { color: var(--warn); border-color: var(--warn); }
+  .chain { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: clamp(1.1rem, 2.2vw, 1.8rem); font-weight: 700; }
+  .chain span.box { background: var(--panel); border: 1px solid var(--line); padding: 14px 22px; border-radius: 14px; }
+  .chain .arrow { color: var(--accent); }
+  /* pipeline diagram */
+  .flow { display: grid; grid-template-columns: 1.25fr auto 1fr auto 1fr auto 1fr; align-items: stretch; gap: 14px; }
+  .col { display: flex; flex-direction: column; gap: 8px; }
+  .col h4 { font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); text-align: center; }
+  .node { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: .92rem; text-align: center; }
+  .node.acc { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+  .node.center { flex: 1; display: flex; align-items: center; justify-content: center; background: var(--panel2); border-color: var(--accent); font-weight: 700; }
+  .flow .ar { align-self: start; margin-top: 1rem; color: var(--accent); font-size: 1.8rem; }
+  .note { font-size: .74rem; color: var(--warn); margin-top: -4px; text-align: center; }
+  /* lena */
+  .pain { display: grid; gap: 10px; }
+  .pain div { background: var(--panel); border-left: 4px solid var(--bad); padding: 10px 16px; border-radius: 8px; }
+  .need div { border-left-color: var(--accent); }
+  .steps { display: grid; gap: 12px; counter-reset: s; }
+  .steps div { counter-increment: s; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 18px 12px 56px; position: relative; }
+  .steps div::before { content: counter(s); position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 800; display: grid; place-items: center; }
+  /* demo */
+  section.demo { padding: 0; }
+  .demo-bar { display: flex; align-items: center; gap: 16px; padding: 12px 24px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .demo-bar a { color: var(--accent2); margin-left: auto; font-size: .9rem; }
+  section.demo iframe { flex: 1; width: 100%; min-height: calc(100vh - 56px); border: 0; background: #fff; }
+  section.demo { justify-content: flex-start; gap: 0; }
+  /* nav */
+  nav.dots { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); display: grid; gap: 9px; z-index: 5; }
+  nav.dots a { width: 10px; height: 10px; border-radius: 50%; background: var(--line); display: block; }
+  nav.dots a.on { background: var(--accent); transform: scale(1.4); }
+  .bar { position: fixed; left: 0; top: 0; height: 3px; background: var(--accent); width: 0; z-index: 6; }
+  .hint { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); color: var(--muted); font-size: .8rem; z-index: 5; }
+  /* analysis slides (Marko) — one system: teal = default/AC, orange = DC/caveat, teal-tint = the one emphasised element */
+  section.ana {
+    --fs: clamp(1.05rem, min(1.5vw, 2.7vh), 1.7rem);
+    --fs-h3: clamp(1.2rem, min(1.85vw, 3.3vh), 2.1rem);
+    --fs-lab: clamp(.8rem, min(1vw, 1.8vh), 1.15rem);
+    --pad: clamp(14px, min(1.4vw, 2.5vh), 28px);
+    --gap: clamp(12px, min(1.3vw, 2.3vh), 26px);
+    gap: calc(var(--gap) * 1.3);
+  }
+  .ana h2 { margin-bottom: calc(var(--gap) * -.3); }
+  .ana .sub { font-size: var(--fs); color: var(--muted); margin-top: calc(var(--gap) * -.6); }
+  .ana .sub b { color: var(--text); }
+  .ana .row { display: grid; gap: var(--gap); align-items: stretch; }
+  .ana .r2 { grid-template-columns: repeat(2, 1fr); } .ana .r3 { grid-template-columns: repeat(3, 1fr); } .ana .r4 { grid-template-columns: repeat(4, 1fr); }
+  .ana .grp { display: grid; grid-template-rows: auto 1fr; gap: calc(var(--gap) * .55); }
+  /* group heading: muted label with a rule running to the right edge */
+  .ana .gh { display: flex; align-items: center; gap: 14px; font-size: var(--fs-lab); font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .ana .gh::after { content: ""; flex: 1; border-top: 1px solid #bcc8de; }
+  /* cards */
+  .ana .box { background: #fff; border: 1px solid #bcc8de; border-top: 4px solid var(--accent); border-radius: 14px; padding: var(--pad); box-shadow: 0 2px 0 rgba(20, 33, 61, .10), 0 6px 16px rgba(20, 33, 61, .06); display: flex; flex-direction: column; gap: calc(var(--gap) * .35); }
+  .ana .box.dc { border-top-color: var(--pop); }
+  .ana .box.hl { background: #e3f1ee; border-color: var(--accent); }
+  .ana .box.soft { background: var(--panel); border-top-width: 1px; border-top-color: #bcc8de; box-shadow: none; }
+  .ana .box h3 { font-size: var(--fs-h3); line-height: 1.2; color: var(--text); }
+  .ana .box p, .ana .box li { font-size: var(--fs); color: var(--muted); line-height: 1.4; }
+  .ana .box p.strong { color: var(--text); }
+  .ana .box ul { padding-left: 1.1em; display: grid; gap: .6vh; }
+  .ana .hero { font-size: clamp(1.8rem, min(3.3vw, 5.9vh), 3.5rem); font-weight: 800; line-height: 1.05; color: var(--accent); }
+  .ana .hero.ink { color: var(--text); }
+  .ana .hero.dc { color: var(--pop); }
+  /* card header band (Input / Output) */
+  .ana .band { margin: calc(var(--pad) * -1) calc(var(--pad) * -1) calc(var(--gap) * .4); padding: calc(var(--pad) * .55) var(--pad); background: var(--accent); color: #fff; font-size: var(--fs-h3); font-weight: 800; letter-spacing: .04em; border-radius: 10px 10px 0 0; }
+  .ana .box:has(> .band) { border-top: 1px solid var(--accent); }
+  /* icon tile */
+  .ana .ico { width: clamp(40px, min(3.4vw, 6vh), 62px); height: clamp(40px, min(3.4vw, 6vh), 62px); flex: none; border-radius: 12px; background: #e3f1ee; color: var(--accent); display: grid; place-items: center; }
+  .ana .ico.dc { background: #fdebd3; color: var(--pop); }
+  .ana .ico svg { width: 56%; height: 56%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .ana .head { display: flex; align-items: center; gap: calc(var(--gap) * .6); }
+  /* step sequence with arrows between cards */
+  .ana .seq { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; align-items: stretch; gap: calc(var(--gap) * .45); }
+  .ana .seq .arr { align-self: center; color: var(--accent); width: clamp(22px, 1.9vw, 38px); }
+  .ana .seq .arr svg { width: 100%; fill: none; stroke: currentColor; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; }
+  .ana .num { width: clamp(30px, min(2.3vw, 4vh), 42px); height: clamp(30px, min(2.3vw, 4vh), 42px); flex: none; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 800; font-size: var(--fs); display: grid; place-items: center; }
+  /* caveat bar: same left-border language as the deck's pain/need lists */
+  .ana .caveat { background: #fff; border: 1px solid #bcc8de; border-left: 5px solid var(--warn); border-radius: 10px; padding: calc(var(--pad) * .7) var(--pad); font-size: var(--fs); color: var(--muted); }
+  .ana .caveat b { color: var(--text); }
+  .ana .caveat ul { padding-left: 1.1em; display: grid; gap: .5vh; }
+  .ana .dark { background: var(--text); color: #fff; border-radius: 14px; padding: var(--pad); font-size: var(--fs); line-height: 1.45; display: flex; flex-direction: column; justify-content: center; }
+  .ana .dark b { color: #ffb38a; }
+  /* tables */
+  .ana .tbl2 { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; background: #fff; border: 1px solid #bcc8de; border-radius: 14px; overflow: hidden; box-shadow: 0 2px 0 rgba(20, 33, 61, .10), 0 6px 16px rgba(20, 33, 61, .06); }
+  .ana .tbl2 th { text-align: left; font-size: var(--fs-lab); letter-spacing: .08em; text-transform: uppercase; color: var(--text); background: #e3f1ee; padding: calc(var(--pad) * .5) calc(var(--pad) * .8); border-bottom: 2px solid var(--accent); }
+  .ana .tbl2 td { font-size: var(--fs); padding: calc(var(--pad) * .45) calc(var(--pad) * .8); border-bottom: 1px solid var(--line); color: var(--muted); vertical-align: top; line-height: 1.35; }
+  .ana .tbl2 tr:last-child td { border-bottom: 0; }
+  .ana .tbl2 td:first-child { color: var(--text); font-weight: 700; }
+  .ana .tbl2 td.r { color: var(--accent); font-weight: 700; }
+  .ana .tbl2 td.key { color: var(--text); }
+  /* numbered list with aligned columns */
+  .ana .nums { display: grid; border-top: 1px solid #bcc8de; }
+  .ana .nums > div { display: grid; grid-template-columns: 2.4em 1fr 1fr; align-items: baseline; gap: var(--gap); padding: calc(var(--pad) * .75) 0; border-bottom: 1px solid #bcc8de; font-size: clamp(1.1rem, min(1.6vw, 2.85vh), 1.8rem); }
+  .ana .nums i { font-style: normal; color: var(--pop); font-weight: 800; font-size: 1.15em; }
+  .ana .nums b { color: var(--text); }
+  .ana .nums span { color: var(--muted); font-size: .9em; }
+  /* check list (outputs) */
+  .ana .checks { list-style: none; padding: 0 !important; display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--gap) * .6) var(--gap) !important; }
+  .ana .checks li { color: var(--text) !important; font-weight: 600; display: flex; gap: .55em; align-items: baseline; }
+  .ana .checks li::before { content: "✓"; color: var(--accent); font-weight: 800; }
+  /* equation: tokens joined by operators */
+  .ana .eq { display: flex; flex-wrap: wrap; align-items: center; gap: .45em; font-size: var(--fs); color: var(--muted); }
+  .ana .eq span { background: #fff; border: 1px solid #bcc8de; border-radius: 8px; padding: .2em .6em; color: var(--text); font-weight: 600; }
+  .ana .eq span.k { border-color: var(--accent); color: var(--accent); }
+  .ana .tokens { display: flex; flex-wrap: wrap; gap: calc(var(--gap) * .5); }
+  .ana .tokens span { font-size: var(--fs); font-weight: 700; color: var(--text); background: #fff; border: 1px solid #bcc8de; border-left: 4px solid var(--accent); border-radius: 8px; padding: .35em .85em; }
+  .ana .rows { display: grid; border-top: 1px solid #bcc8de; }
+  .ana .rows > div { display: grid; grid-template-columns: auto minmax(0, .8fr) minmax(0, 1.2fr); align-items: center; gap: var(--gap); padding: calc(var(--pad) * 1.1) 0; border-bottom: 1px solid #bcc8de; }
+  .ana .rows h3 { font-size: var(--fs-h3); color: var(--text); }
+  .ana .rows p, .ana .rows li { font-size: var(--fs); color: var(--muted); line-height: 1.4; }
+  .ana .rows ul { padding-left: 1.1em; display: grid; gap: .5vh; }
+  .ana .divide { border-left: 1px solid #bcc8de; padding-left: var(--gap); }
+  /* source footnote pinned to the slide bottom */
+  .ana .src { position: absolute; left: 7vw; right: 7vw; bottom: 5.5vh; font-size: var(--fs-lab); color: var(--muted); }
+  .ana .src a { color: var(--accent2); }
+  @media (max-height: 800px) { section.ana { padding-top: 4vh; padding-bottom: 6vh; } .ana .src { bottom: 4.5vh; } }
+  @media (max-width: 900px) {
+    .ana .r2, .ana .r3, .ana .r4, .ana .seq, .ana .checks { grid-template-columns: 1fr; }
+    .ana .seq .arr { transform: rotate(90deg); justify-self: center; }
+    .ana .nums > div { grid-template-columns: 2em 1fr; } .ana .nums span { grid-column: 2; }
+    .ana .rows > div { grid-template-columns: auto 1fr; } .ana .rows > div > :last-child { grid-column: 2; }
+    .ana .divide { border-left: 0; padding-left: 0; } .ana .src { position: static; }
+  }
+  @media (max-height: 800px) {
+    section.slide { padding-top: 4vh; padding-bottom: 5vh; gap: 2vh; }
+    h2 { font-size: min(3.2vw, 5.2vh); }
+    .lead { font-size: min(1.8vw, 2.9vh); }
+    .pain { gap: 6px; } .pain div { padding: 6px 14px; font-size: .95rem; }
+    .card { padding: 14px 18px; } .node { padding: 5px 10px; font-size: .85rem; }
+    .flow .col { gap: 5px; } .steps div { padding-top: 8px; padding-bottom: 8px; }
+  }
+  @media (max-width: 900px) {
+    .g2, .g3, .g4 { grid-template-columns: 1fr; }
+    .flow { grid-template-columns: 1fr; } .flow .ar { transform: rotate(90deg); }
+    nav.dots { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="bar" id="bar"></div>
+<nav class="dots" id="dots"></nav>
+<div class="hint">↓ / Space / scroll</div>
+
+<!-- 1 -->
+<section class="slide" id="s1">
+  <span class="kicker">DS500 · Interim presentation</span>
+  <h1>Where should the next charging station go?</h1>
+  <p class="lead">Open data + a demand model + budget-constrained optimization, shown on a web map for Baden-Württemberg.</p>
+  <p class="tag" style="align-self:flex-start">Arun · Marko · Roland</p>
+</section>
+
+<!-- 2 -->
+<section class="slide" id="s2">
+  <span class="speaker">Arun</span>
+  <span class="kicker">1 · Who is the user?</span>
+  <h2>Operators and investors with a limited budget</h2>
+  <div class="grid g2">
+    <div class="card hl">
+      <span class="tag ok">Primary</span>
+      <h3 style="margin-top:10px">Charge point operators &amp; investors in Baden-Württemberg</h3>
+      <p>Charge point operators, utilities, energy companies planning new sites.</p>
+      <p style="margin-top:8px"><b>Limits:</b> budget, area</p>
+    </div>
+    <div class="card">
+      <span class="tag">Secondary</span>
+      <h3 style="margin-top:10px">Municipalities</h3>
+      <p>Need: fair access to charging for residents.</p>
+    </div>
+  </div>
+  <div class="chain">
+    <span class="box">Profit</span><span class="arrow">→</span>
+    <span class="box">Usage</span><span class="arrow">→</span>
+    <span class="box" style="border-color:var(--accent);color:var(--accent)">Demand</span>
+  </div>
+  <p class="lead">Maximizing profit comes down to finding where demand is.</p>
+</section>
+
+<!-- 3 -->
+<section class="slide" id="s3">
+  <span class="speaker">Roland</span>
+  <span class="kicker">2 · How will they use it?</span>
+  <h2 class="wide">Meet Lena, charge point operator expansion manager at EnBW, Karlsruhe</h2>
+  <p class="lead">Her team has a budget. She must pick the best sites and defend the choice to her supervisors.</p>
+  <div class="grid g2">
+    <div>
+      <h3 style="margin-bottom:10px">Today she cannot …</h3>
+      <div class="pain">
+        <div>see where charging demand is high</div>
+        <div>see which stations are over- or underused</div>
+        <div>find candidate sites without checking parking lots by hand</div>
+        <div>decide how many and which type of chargers to build</div>
+        <div>estimate returns for each recommendation</div>
+      </div>
+    </div>
+    <div>
+      <h3 style="margin-bottom:10px">She needs …</h3>
+      <div class="pain need">
+        <div>a demand map, with electric vehicle density per area</div>
+        <div>demand vs. existing supply: the gap</div>
+        <div>ranked candidate sites</div>
+        <div>number and type of chargers per site</div>
+        <div>the assumptions behind every number</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="slide" id="s4">
+  <span class="speaker">Roland</span>
+  <span class="kicker">2 · How will they use it?</span>
+  <h2>Her workflow in the app</h2>
+  <div class="steps" style="max-width:760px">
+    <div><b>Choose an area:</b> municipality, district, or radius around a point</div>
+    <div><b>Set a budget</b></div>
+    <div><b>Get recommended sites</b> from demand, access, building availability and existing supply</div>
+    <div><b>Get the exact number and type</b> of chargers per site</div>
+    <div><b>See the estimates</b> behind every result</div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="slide" id="s5">
+  <span class="kicker">3 · What are we building?</span>
+  <h2 class="wide">A pipeline, a machine learning model and a web map: open data in, site recommendation out</h2>
+  <div class="flow">
+    <div class="col">
+      <h4>Sources</h4>
+      <div class="node">Bundesnetzagentur charger register</div>
+      <div class="node acc">MobiData Baden-Württemberg: live status + history</div>
+      <div class="note">occupancy covers ~1/3 of stations</div>
+      <div class="node">Zensus 2022: population</div>
+      <div class="node">Federal Motor Transport Authority: electric vehicle share</div>
+      <div class="node">Federal Employment Agency: income</div>
+      <div class="node">OpenStreetMap: parking, points of interest, roads, substations</div>
+      <div class="node">Federal Agency for Cartography and Geodesy: boundaries</div>
+    </div>
+    <div class="ar">→</div>
+    <div class="col"><h4>Pipeline</h4><div class="node center">Automated download, cleaning &amp; validation</div></div>
+    <div class="ar">→</div>
+    <div class="col">
+      <h4>Prepared layers</h4>
+      <div class="node">500 m demand grid</div>
+      <div class="node">Existing supply</div>
+      <div class="node">Observed occupancy per station</div>
+      <div class="node">Candidate sites</div>
+    </div>
+    <div class="ar">→</div>
+    <div class="col">
+      <h4>Output</h4>
+      <div class="node acc">Demand gap</div>
+      <div class="node acc">Ranked sites</div>
+      <div class="node acc">Web map</div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="slide" id="s6">
+  <span class="kicker">3 · The data</span>
+  <h2>What we have, and where it is thin</h2>
+  <div class="grid g4">
+    <div class="card"><div class="big">18,863</div><p>charging stations in Baden-Württemberg (register)</p></div>
+    <div class="card"><div class="big">~140k</div><p>parking sites as candidates (OpenStreetMap + MobiData)</p></div>
+    <div class="card"><div class="big">500 m</div><p>demand grid from Zensus 2022</p></div>
+    <div class="card"><div class="big">~1/3</div><p>of stations with observed usage</p></div>
+  </div>
+  <div class="grid g2">
+    <div class="card"><h3>Also in the data</h3><ul>
+      <li>Electric vehicle share, income, land use</li>
+      <li>Supermarkets, hospitals, universities</li>
+      <li>Substations as grid-connection proxy</li>
+      <li>Motorways and junctions</li></ul></div>
+    <div class="card"><h3 style="color:var(--warn)">Limits</h3><ul>
+      <li>Usage data is biased toward larger networks</li>
+      <li>Usage exists only where stations already stand</li>
+      <li>Electric vehicle share and income are coarse (1–5 km), spread over 500 m</li>
+      <li>Private vs. public parking hard to tell apart in OpenStreetMap</li>
+      <li>No revenue data: returns rest on stated assumptions</li></ul></div>
+  </div>
+</section>
+
+<!-- 7 · Demand: features and target -->
+<section class="slide ana" id="s7">
+  <span class="speaker">Marko</span>
+  <span class="kicker">4 · Demand estimation</span>
+  <h2>Features and target</h2>
+  <p class="sub"><b>Unit:</b> one site = all stations within 50 m</p>
+  <div class="grp">
+    <div class="gh">Features</div>
+    <div class="row r2">
+      <table class="tbl2">
+        <colgroup><col style="width:30%"><col style="width:20%"><col></colgroup>
+        <tr><th>Group</th><th>Radius</th><th>Why in the model</th></tr>
+        <tr><td>Residents</td><td class="r">1 km</td><td>Flats mean no home charging</td></tr>
+        <tr><td>Income</td><td class="r">1 km</td><td>EV ownership follows income</td></tr>
+        <tr><td>EV share</td><td class="r">5 km</td><td>More EVs, more charging</td></tr>
+        <tr><td>Destinations</td><td class="r">500 m</td><td>Cars park there for hours</td></tr>
+        <tr><td>Site type</td><td class="r">at site</td><td>Fee, access, parking type</td></tr>
+      </table>
+      <table class="tbl2">
+        <colgroup><col style="width:30%"><col style="width:20%"><col></colgroup>
+        <tr><th>Group</th><th>Radius</th><th>Why in the model</th></tr>
+        <tr><td>Roads</td><td class="r">distance</td><td>Traffic charges en route</td></tr>
+        <tr><td>Competition</td><td class="r">0.5–5 km</td><td>Shares the demand</td></tr>
+        <tr><td>Operator</td><td class="r">–</td><td>Stands in for price</td></tr>
+        <tr><td>Station age</td><td class="r">–</td><td>New stations fill slowly</td></tr>
+        <tr><td>Power class</td><td class="r">AC / DC</td><td>Used differently</td></tr>
+      </table>
+    </div>
+  </div>
+  <div class="grp">
+    <div class="gh">Target</div>
+    <div class="box hl">
+      <div class="row r2" style="align-items:center">
+        <div class="hero ink">Mean occupancy per charging point</div>
+        <div class="divide" style="display:grid;gap:.8vh">
+          <h3>What it really is: the market’s guess of demand</h3>
+          <p><b style="color:var(--text)">Assumption:</b> the market guesses demand well.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 8 · Demand: model -->
+<section class="slide ana" id="s8">
+  <span class="speaker">Marko</span>
+  <span class="kicker">4 · Demand estimation</span>
+  <h2>Random Forest</h2>
+  <div class="grp">
+    <div class="gh">Why</div>
+    <div class="row r4">
+      <div class="box">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg></div>
+        <h3>Mixed features</h3><p>Counts, distances and categories</p>
+      </div>
+      <div class="box">
+        <div class="ico"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="12" cy="18" r="2"/><path d="M7 6h10M6 8l5 8.3M18 8l-5 8.3"/></svg></div>
+        <h3>Learns interactions</h3><p>Finds them on its own</p>
+      </div>
+      <div class="box">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></div>
+        <h3>Easy to explain</h3><p>Works with defaults</p>
+      </div>
+      <div class="box">
+        <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg></div>
+        <h3>Proven</h3><p>Used in the closest study: Weekx et al. (2025)</p>
+      </div>
+    </div>
+  </div>
+  <div class="grp">
+    <div class="gh">Setup</div>
+    <div class="row r2">
+      <div class="box soft"><p class="strong"><b>One model</b> for AC and DC, power class as a feature</p></div>
+      <div class="box soft"><p class="strong"><b>If time allows:</b> compare with HistGradientBoosting</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 9 · Demand: validation -->
+<section class="slide ana" id="s9">
+  <span class="speaker">Marko</span>
+  <span class="kicker">4 · Demand estimation</span>
+  <h2>Two tests, three baselines</h2>
+  <div class="grp">
+    <div class="gh">Tests</div>
+    <div class="row r2">
+      <div class="box hl">
+        <h3>Spatial block CV</h3>
+        <p class="strong">2 km squares · 5 folds · 5 repeats</p>
+        <p>Why: neighbours never sit on both sides of the split</p>
+      </div>
+      <div class="box hl">
+        <h3>New sites, later months</h3>
+        <p class="strong">Train: opened before 2025 · Test: opened 2025–26, after 1 Jul 2026</p>
+        <p>Why: closest to real use</p>
+      </div>
+    </div>
+  </div>
+  <div class="grp">
+    <div class="gh">Baselines the model must beat</div>
+    <div class="row r3">
+      <div class="box"><h3>Random</h3><p>The floor to clear</p></div>
+      <div class="box"><h3>Supply gap</h3><p>“Demand is where chargers are missing”</p></div>
+      <div class="box"><h3>kNN spatial mean</h3><p>“Demand is where neighbours are busy”</p></div>
+    </div>
+  </div>
+  <div class="grp">
+    <div class="gh">Metrics</div>
+    <div>
+      <div><span>Spearman rank correlation, </span><span>Top-20 % AUC, </span><span>Lift at k, </span><span>Decile plot</span></div>
+      <p style="margin-top:.4vh">↳ Always separate for AC and DC</p>
+    </div>
+  </div>
+</section>
+
+<!-- 10 · Demand: biases -->
+<section class="slide ana" id="s10">
+  <span class="speaker">Marko</span>
+  <span class="kicker">4 · Demand estimation</span>
+  <h2>Biases</h2>
+  <table class="tbl2">
+    <colgroup><col style="width:16%"><col style="width:29%"><col style="width:27%"><col></colgroup>
+    <tr><th>Bias</th><th>Cause</th><th>How we handle it</th><th>What it means</th></tr>
+    <tr><td>Selection</td><td>Feed sees half, mostly big networks</td><td>Operator as feature, averaged out</td><td class="key">Usage as a big network sees it</td></tr>
+    <tr><td>Extrapolation</td><td>Usage seen only at existing stations</td><td>“Low confidence” flag</td><td class="key">Picks in gaps are least certain</td></tr>
+    <tr><td>Endogeneity</td><td>Built where demand is expected</td><td>Read as association only</td><td class="key">Trust the ranking, not effect sizes</td></tr>
+    <tr><td>Censoring</td><td>Full sites hide drivers who left</td><td>Mild; documented</td><td class="key">Busy sites come out slightly small</td></tr>
+    <tr><td>Season</td><td>Stations seen in different months</td><td>Not corrected in v1</td><td class="key">Summer-only sites score a bit low</td></tr>
+  </table>
+</section>
+
+<!-- 11 · Optimization: input and output -->
+<section class="slide ana" id="s11o">
+  <span class="speaker">Marko</span>
+  <span class="kicker">5 · Optimization</span>
+  <h2>Optimizer input and output</h2>
+  <div class="seq" style="grid-template-columns:1fr auto 1fr">
+    <div class="box">
+      <div class="band">INPUT</div>
+      <p>Every public parking spot gets</p>
+      <div class="hero">Predicted hours per day</div>
+      <p style="margin-top:auto;padding-top:1.4vh"><b style="color:var(--text)">for a 2-point site</b></p>
+    </div>
+    <div class="arr" style="width:clamp(28px,2.6vw,50px)"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></div>
+    <div class="box">
+      <div class="band">OUTPUT</div>
+      <ul class="checks">
+        <li>Ranked sites</li>
+        <li>Daily usage</li>
+        <li>Points to build per site</li>
+        <li>Site cost</li>
+        <li>Usage in 2030 and 2035</li>
+        <li>Confidence flag</li>
+      </ul>
+    </div>
+  </div>
+  <p class="src">2030 / 2035: NOW GmbH (2024), <a href="https://reiner-lemoine-institut.de/wp-content/uploads/2024/06/Studie_Ladeinfrastruktur-2025-2030_Neuauflage-2024.pdf" target="_blank" rel="noopener"><i>Ladeinfrastruktur nach 2025/2030 – Neuauflage 2024</i></a>, Referenzszenario, per Kreis via <a href="https://www.standorttool.de" target="_blank" rel="noopener">StandortTOOL</a> ÷ register supply trend. A scenario, not a forecast.</p>
+</section>
+
+<!-- 12 · Optimization: AC or DC -->
+<section class="slide ana" id="s12o">
+  <span class="speaker">Marko</span>
+  <span class="kicker">5 · Optimization</span>
+  <h2>DC or AC?</h2>
+  <div class="row" style="grid-template-columns:2fr 1fr">
+    <div class="grp">
+      <div class="gh">Context rule: the place decides the type</div>
+      <div class="row r2" style="flex:1">
+        <div class="box dc">
+          <div class="head"><div class="ico dc"><svg viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg></div><h3>DC</h3></div>
+          <ul><li>Motorway services, rest area, junction</li><li>Primary road</li><li>Supermarket or discounter</li></ul>
+        </div>
+        <div class="box">
+          <div class="head"><div class="ico"><svg viewBox="0 0 24 24"><path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0z"/><path d="M12 17v5"/></svg></div><h3>AC</h3></div>
+          <ul><li>Everywhere else</li><li>Homes, offices, hospitals, P+R</li><li>Cars stand for hours</li></ul>
+        </div>
+      </div>
+    </div>
+    <div class="grp">
+      <div class="gh">Money</div>
+      <div class="box hl" style="flex:1">
+        <div class="head"><div class="ico" style="background:#fff"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M16 14.5h2"/></svg></div><h3>Two budgets</h3></div>
+        <ul><li>One € budget for AC, one for DC</li><li>Never ranked against each other</li></ul>
+      </div>
+    </div>
+  </div>
+  <div class="caveat"><b>Limitation:</b> oversimplistic. Addressed in a future version.</div>
+</section>
+
+<!-- 13 · Optimization: greedy -->
+<section class="slide ana" id="s13o">
+  <span class="speaker">Marko</span>
+  <span class="kicker">5 · Optimization</span>
+  <h2>Greedy search: pick until the money runs out</h2>
+  <div class="seq">
+    <div class="box">
+      <div class="head"><div class="ico"><svg viewBox="0 0 24 24"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg></div><h3>Filter</h3></div>
+      <p>Only spots in the chosen radius</p>
+    </div>
+    <div class="arr"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></div>
+    <div class="box">
+      <div class="head"><div class="ico"><svg viewBox="0 0 24 24"><path d="M5 20v-6M12 20V4M19 20v-10M2 20h20"/></svg></div><h3>Rank</h3></div>
+      <p>By predicted point-hours, separately for AC and DC</p>
+    </div>
+    <div class="arr"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></div>
+    <div class="box">
+      <div class="head"><div class="ico"><svg viewBox="0 0 24 24"><path d="M3 5v14M21 5v14M7 12h10M10 9l-3 3 3 3M14 9l3 3-3 3"/></svg></div><h3>Space</h3></div>
+      <p>Skip spots too close to an earlier pick</p>
+    </div>
+    <div class="arr"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></div>
+    <div class="box">
+      <div class="head"><div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5a4.5 4.5 0 1 0 0 7M7 10.5h6M7 13.5h6"/></svg></div><h3>Pay</h3></div>
+      <p>Site cost = per-site + per-point cost × points; stop at budget</p>
+    </div>
+  </div>
+  <div class="row r2">
+    <div class="caveat"><b>Limits</b><ul style="margin-top:.6vh">
+      <li>Busiest sites first, not most usage per euro</li>
+      <li>Hard spacing cutoff</li>
+      <li>No guaranteed optimum</li></ul></div>
+    <div class="dark"><p><b>Deliberately primitive for now.</b> The priority is getting the demand model right; a better optimizer follows easily from it.</p></div>
+  </div>
+</section>
+
+<!-- 14 · Optimization: sizing -->
+<section class="slide ana" id="s14o">
+  <span class="speaker">Marko</span>
+  <span class="kicker">5 · Optimization</span>
+  <h2>Sizing algorithm</h2>
+  <div class="seq">
+    <div class="box" style="justify-content:center"><div class="head"><div class="num">1</div><p class="strong">Predict demand for a 2-point site</p></div></div>
+    <div class="arr"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></div>
+    <div class="box" style="justify-content:center"><div class="head"><div class="num">2</div><p class="strong">Spread it over 2, 4, 6 … points</p></div></div>
+    <div class="arr"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></div>
+    <div class="box" style="justify-content:center"><div class="head"><div class="num">3</div><p class="strong">Look up how often such sites are full</p></div></div>
+    <div class="arr"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></div>
+    <div class="box" style="justify-content:center"><div class="head"><div class="num">4</div><p class="strong">Pick the smallest size that fits the rule</p></div></div>
+  </div>
+  <div class="row r2">
+    <div class="box"><h3>AC fullness rule</h3><div class="hero">≤ 31 % of days full</div></div>
+    <div class="box dc"><h3>DC fullness rule</h3><div class="hero dc">≤ 5 % of days full</div></div>
+  </div>
+  <div class="box soft"><p><b style="color:var(--text)">Full day:</b> in its busiest hour, every charging point was in use for the whole hour.</p></div>
+</section>
+
+<!-- 15 · Limitations -->
+<section class="slide ana" id="s15o">
+  <span class="speaker">Marko</span>
+  <span class="kicker">6 · Limitations</span>
+  <h2>Five things that can mislead</h2>
+  <div class="nums">
+    <div><i>1</i><b>The feed sees about half of public points</b><span>Mostly big networks and fast charging</span></div>
+    <div><i>2</i><b>Occupancy is not demand</b><span>Overnight AC looks busy; AC and DC not comparable</span></div>
+    <div><i>3</i><b>Price is missing</b><span>The strongest driver of usage</span></div>
+    <div><i>4</i><b>Picks sit in gaps</b><span>Where the model is weakest; the flag shows it</span></div>
+    <div><i>5</i><b>The optimizer is still primitive</b><span>Greedy, hard spacing cutoff, unvalidated</span></div>
+  </div>
+</section>
+
+<!-- 16 · Future -->
+<section class="slide ana" id="s16o">
+  <span class="speaker">Marko</span>
+  <span class="kicker">7 · Future additions</span>
+  <h2>What comes next</h2>
+  <div class="rows">
+    <div>
+      <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+      <h3>Lifespan buttons</h3>
+      <p>Set the station lifetime in the app</p>
+    </div>
+    <div>
+      <div class="ico"><svg viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h7.5a3.5 3.5 0 0 0 0-7h-7a3.5 3.5 0 0 1 0-7H16"/></svg></div>
+      <h3>A better optimizer</h3>
+      <ul>
+        <li>Demand decay around picks, not a hard cutoff</li>
+        <li>Most usage per euro</li>
+        <li>Every spot scored as both AC and DC</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 12 demo -->
+<section class="slide demo" id="demo">
+  <div class="demo-bar">
+    <span class="kicker">Live demo · Arun</span>
+    <span class="tag">Try: Supply gap layer · click a 500 m cell · double-click a point for Street View</span>
+    <a href="../app/index.html" target="_blank" rel="noopener">Open full screen ↗</a>
+  </div>
+  <iframe id="app" title="Electric vehicle charging map" data-src="../app/index.html" allow="fullscreen; geolocation"></iframe>
+</section>
+
+<script>
+  const slides = [...document.querySelectorAll("section.slide")];
+  const dots = document.getElementById("dots");
+  slides.forEach((s, i) => {
+    const a = document.createElement("a");
+    a.href = "#" + s.id; a.title = "Slide " + (i + 1);
+    dots.appendChild(a);
+  });
+  const links = [...dots.children];
+  const bar = document.getElementById("bar");
+  // Load the app only when the last slide gets close
+  const frame = document.getElementById("app");
+  const loadApp = () => { if (!frame.src) frame.src = frame.dataset.src; };
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (e.isIntersecting) {
+        links.forEach((l, i) => l.classList.toggle("on", slides[i] === e.target));
+        if (e.target.id === "s16o" || e.target.id === "demo") loadApp();
+      }
+    });
+  }, { threshold: 0.55 });
+  slides.forEach((s) => io.observe(s));
+  addEventListener("scroll", () => {
+    const h = document.documentElement;
+    bar.style.width = (h.scrollTop / (h.scrollHeight - h.clientHeight)) * 100 + "%";
+  }, { passive: true });
+  addEventListener("keydown", (e) => {
+    if (document.activeElement === frame) return;
+    const cur = links.findIndex((l) => l.classList.contains("on"));
+    let next = null;
+    if (["ArrowDown", "PageDown", " "].includes(e.key)) next = Math.min(cur + 1, slides.length - 1);
+    if (["ArrowUp", "PageUp"].includes(e.key)) next = Math.max(cur - 1, 0);
+    if (next !== null) { e.preventDefault(); slides[next].scrollIntoView(); }
+  });
+</script>
+</body>
+</html>
